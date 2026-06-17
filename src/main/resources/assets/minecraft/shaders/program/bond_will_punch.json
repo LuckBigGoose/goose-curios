@@ -1,0 +1,28 @@
+{
+  "blend": {
+    "func": "add",
+    "srcrgb": "one",
+    "dstrgb": "zero"
+  },
+  "vertex": "sobel",
+  "fragment": "bond_will_punch",
+  "attributes": [
+    "Position"
+  ],
+  "samplers": [
+    {
+      "name": "DiffuseSampler"
+    }
+  ],
+  "uniforms": [
+    { "name": "ProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "OutSize", "type": "float", "count": 2, "values": [ 1.0, 1.0 ] },
+    { "name": "DashIntensity", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "PunchIntensity", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "ShakeIntensity", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "GrabIntensity", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "LockIntensity", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "Time", "type": "float", "count": 1, "values": [ 0.0 ] }
+  ]
+}
+

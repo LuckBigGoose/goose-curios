@@ -1,0 +1,26 @@
+{
+  "targets": [
+    "swap"
+  ],
+  "passes": [
+    {
+      "name": "bond_will_punch",
+      "intarget": "minecraft:main",
+      "outtarget": "swap",
+      "uniforms": [
+        { "name": "DashIntensity", "values": [ 0.0 ] },
+        { "name": "PunchIntensity", "values": [ 0.0 ] },
+        { "name": "ShakeIntensity", "values": [ 0.0 ] },
+        { "name": "GrabIntensity", "values": [ 0.0 ] },
+        { "name": "LockIntensity", "values": [ 0.0 ] },
+        { "name": "Time", "values": [ 0.0 ] }
+      ]
+    },
+    {
+      "name": "blit",
+      "intarget": "swap",
+      "outtarget": "minecraft:main"
+    }
+  ]
+}
+

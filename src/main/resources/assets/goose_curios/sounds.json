@@ -1,0 +1,11 @@
+{
+  "bond_will_boom": {
+    "sounds": [
+      {
+        "name": "goose_curios:bond_will/boom",
+        "stream": false
+      }
+    ]
+  }
+}
+

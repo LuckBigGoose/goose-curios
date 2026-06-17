@@ -1,0 +1,33 @@
+{
+  "required": false,
+  "package": "com.luckgoose.goosecurios.mixin",
+  "plugin": "com.luckgoose.goosecurios.mixin.GooseCuriosMixinPlugin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "goose_curios.refmap.json",
+  "mixins": [
+    "BondVanishingVisibilityMixin",
+    "BondWillContainerRightClickMixin",
+    "bondwill.BondWillServerLevelEntityTickMixin",
+    "SlimeAccessor"
+  ],
+  "client": [
+    "client.BondWillContainerScreenRightClickMixin",
+    "client.LivingEntityRendererCloakMixin",
+    "client.HumanoidArmorLayerCloakMixin",
+    "client.CuriosLayerCloakMixin",
+    "client.PlayerRendererHandCloakMixin",
+    "client.PostChainAccessor",
+    "client.EnderDragonAccessor",
+    "client.SlimeClientAccessor",
+    "client.WalkAnimationStateAccessor",
+    "client.AnimationStateAccessor",
+    "client.WardenClientAccessor",
+    "client.BondWillEntityClientFreezeMixin",
+    "client.BondWillLevelRendererWeatherFreezeMixin",
+    "client.BondWillEntityRenderDispatcherFreezeMixin",
+    "client.BondWillLivingEntityRendererFreezeMixin",
+    "client.BondWillEnderDragonRendererFreezeMixin"
+  ],
+  "minVersion": "0.8"
+}
+
