@@ -1,6 +1,7 @@
 package com.luckgoose.goosecurios.network;
 
 import com.luckgoose.goosecurios.client.ClientPacketHandlers;
+import com.luckgoose.goosecurios.compat.tacz.bondwill.BondWillSettings;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.api.distmarker.Dist;
@@ -11,9 +12,9 @@ import java.util.function.Supplier;
 
 /**
  * 邦德的意志状态同步网络包
- * 
+ *
  * <p>用于将服务端的邦德的意志状态同步到客户端，用于UI显示
- * 
+ *
  * <p>包含字段：
  * <ul>
  *   <li>progress：蓄力进度（0.0-1.0）</li>
@@ -26,15 +27,15 @@ import java.util.function.Supplier;
  *   <li>timeStopCountdownProgress：时停倒计时进度（0.0-1.0）</li>
  *   <li>settings：客户端显示设置（特效开关）</li>
  * </ul>
- * 
+ *
  * <p>性能优化：
  * <ul>
  *   <li>使用VarInt压缩整数（cooldownTicks），通常1-2字节</li>
  *   <li>直接序列化布尔值而非NBT，从~100字节降至26字节（-79%）</li>
  * </ul>
- * 
+ *
  * <p>网络大小：约26字节（4个float + 8个boolean + 1个VarInt）
- * 
+ *
  * @author luckgoose
  * @see ClientPacketHandlers#handleBondWill
  */
@@ -42,34 +43,34 @@ public class BondWillSyncPacket {
 
     /** 蓄力进度：0.0（未蓄力）到1.0（满蓄力） */
     private final float progress;
-    
+
     /** 当前伤害加成百分比（例如0.5表示50%加成） */
     private final float bonus;
-    
+
     /** 最大伤害加成百分比 */
     private final float maxBonus;
-    
+
     /** 是否处于隐身状态 */
     private final boolean active;
-    
+
     /** 是否装备邦德的意志 */
     private final boolean equipped;
-    
+
     /** 冷却剩余时间（游戏刻） */
     private final int cooldownTicks;
-    
+
     /** 时停是否激活 */
     private final boolean timeStopActive;
-    
+
     /** 时停倒计时进度：0.0（刚开始）到1.0（即将结束） */
     private final float timeStopCountdownProgress;
-    
+
     /** 客户端显示设置：特效开关（enableTimeStop, enableGrayScale, enableShotEffect, enableShotSound） */
     private final CompoundTag settings;
 
     /**
      * 简化构造函数：只包含基本字段
-     * 
+     *
      * @param progress 蓄力进度
      * @param bonus 伤害加成
      * @param maxBonus 最大加成
@@ -81,7 +82,7 @@ public class BondWillSyncPacket {
 
     /**
      * 构造函数：包含装备状态和冷却
-     * 
+     *
      * @param progress 蓄力进度
      * @param bonus 伤害加成
      * @param maxBonus 最大加成
@@ -95,7 +96,7 @@ public class BondWillSyncPacket {
 
     /**
      * 构造函数：包含时停状态
-     * 
+     *
      * @param progress 蓄力进度
      * @param bonus 伤害加成
      * @param maxBonus 最大加成
@@ -111,7 +112,7 @@ public class BondWillSyncPacket {
 
     /**
      * 完整构造函数：包含所有字段
-     * 
+     *
      * @param progress 蓄力进度
      * @param bonus 伤害加成
      * @param maxBonus 最大加成
@@ -136,15 +137,15 @@ public class BondWillSyncPacket {
 
     /**
      * 序列化网络包到字节缓冲区
-     * 
+     *
      * <p>性能优化：
      * <ul>
      *   <li>使用VarInt压缩整数：cooldownTicks通常&lt;200，只需1-2字节</li>
      *   <li>直接序列化布尔值：避免NBT的标签开销</li>
      * </ul>
-     * 
-     * <p>修复：序列化所有5个设置字段，使用正确的键名
-     * 
+     *
+     * <p>G2 修复：设置字段键名复用 {@link BondWillSettings} 常量，避免硬编码重复
+     *
      * @param msg 网络包
      * @param buf 字节缓冲区
      */
@@ -157,24 +158,23 @@ public class BondWillSyncPacket {
         buf.writeVarInt(msg.cooldownTicks);
         buf.writeBoolean(msg.timeStopActive);
         buf.writeFloat(msg.timeStopCountdownProgress);
-        
-        // 使用BondWillSettings中的正确键名
-        CompoundTag bondWillSettings = msg.settings.contains("BondWillSettings") 
-            ? msg.settings.getCompound("BondWillSettings") 
+
+        CompoundTag bondWillSettings = msg.settings.contains(BondWillSettings.ROOT)
+            ? msg.settings.getCompound(BondWillSettings.ROOT)
             : msg.settings;
-        
-        buf.writeBoolean(bondWillSettings.contains("TimeStopDesaturation") ? bondWillSettings.getBoolean("TimeStopDesaturation") : true);
-        buf.writeBoolean(bondWillSettings.contains("TimeStopDistortion") ? bondWillSettings.getBoolean("TimeStopDistortion") : true);
-        buf.writeBoolean(bondWillSettings.contains("ShotSound") ? bondWillSettings.getBoolean("ShotSound") : true);
-        buf.writeBoolean(bondWillSettings.contains("ShotEffect") ? bondWillSettings.getBoolean("ShotEffect") : true);
-        buf.writeBoolean(bondWillSettings.contains("HitboxDisplay") ? bondWillSettings.getBoolean("HitboxDisplay") : false);
+
+        buf.writeBoolean(bondWillSettings.contains(BondWillSettings.TIME_STOP_DESATURATION) ? bondWillSettings.getBoolean(BondWillSettings.TIME_STOP_DESATURATION) : true);
+        buf.writeBoolean(bondWillSettings.contains(BondWillSettings.TIME_STOP_DISTORTION) ? bondWillSettings.getBoolean(BondWillSettings.TIME_STOP_DISTORTION) : true);
+        buf.writeBoolean(bondWillSettings.contains(BondWillSettings.SHOT_SOUND) ? bondWillSettings.getBoolean(BondWillSettings.SHOT_SOUND) : true);
+        buf.writeBoolean(bondWillSettings.contains(BondWillSettings.SHOT_EFFECT) ? bondWillSettings.getBoolean(BondWillSettings.SHOT_EFFECT) : true);
+        buf.writeBoolean(bondWillSettings.contains(BondWillSettings.HITBOX_DISPLAY) ? bondWillSettings.getBoolean(BondWillSettings.HITBOX_DISPLAY) : false);
     }
 
     /**
      * 从字节缓冲区反序列化网络包
-     * 
-     * <p>修复：反序列化所有5个设置字段，使用正确的键名
-     * 
+     *
+     * <p>G2 修复：设置字段键名复用 {@link BondWillSettings} 常量
+     *
      * @param buf 字节缓冲区
      * @return 网络包实例
      */
@@ -187,23 +187,22 @@ public class BondWillSyncPacket {
         int cooldownTicks = buf.readVarInt();
         boolean timeStopActive = buf.readBoolean();
         float timeStopCountdownProgress = buf.readFloat();
-        
-        // 修复：使用正确的键名重建设置
+
         CompoundTag rootSettings = new CompoundTag();
         CompoundTag bondWillSettings = new CompoundTag();
-        bondWillSettings.putBoolean("TimeStopDesaturation", buf.readBoolean());
-        bondWillSettings.putBoolean("TimeStopDistortion", buf.readBoolean());
-        bondWillSettings.putBoolean("ShotSound", buf.readBoolean());
-        bondWillSettings.putBoolean("ShotEffect", buf.readBoolean());
-        bondWillSettings.putBoolean("HitboxDisplay", buf.readBoolean());
-        rootSettings.put("BondWillSettings", bondWillSettings);
-        
+        bondWillSettings.putBoolean(BondWillSettings.TIME_STOP_DESATURATION, buf.readBoolean());
+        bondWillSettings.putBoolean(BondWillSettings.TIME_STOP_DISTORTION, buf.readBoolean());
+        bondWillSettings.putBoolean(BondWillSettings.SHOT_SOUND, buf.readBoolean());
+        bondWillSettings.putBoolean(BondWillSettings.SHOT_EFFECT, buf.readBoolean());
+        bondWillSettings.putBoolean(BondWillSettings.HITBOX_DISPLAY, buf.readBoolean());
+        rootSettings.put(BondWillSettings.ROOT, bondWillSettings);
+
         return new BondWillSyncPacket(progress, bonus, maxBonus, active, equipped, cooldownTicks, timeStopActive, timeStopCountdownProgress, rootSettings);
     }
 
     /**
      * 处理网络包：在客户端执行
-     * 
+     *
      * @param msg 网络包
      * @param ctx 网络上下文
      */
@@ -212,4 +211,3 @@ public class BondWillSyncPacket {
         ctx.get().setPacketHandled(true);
     }
 }
-

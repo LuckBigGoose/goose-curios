@@ -244,18 +244,21 @@ public class BondWillState {
         return player.hasEffect(ModEffects.BOND_VANISHING.get());
     }
 
+    /** 隐身效果持续tick数：每tick刷新，故实际持续取决于隐身条件是否满足 */
+    private static final int STEALTH_DURATION_TICKS = 6;
+
     /**
      * 激活隐身效果
-     * 
+     *
      * <p>
-     * 施加BondVanishing效果，持续6tick（0.3秒）。
+     * 施加BondVanishing效果，持续 STEALTH_DURATION_TICKS（6tick = 0.3秒）。
      * 效果会在每tick刷新，因此实际持续时间取决于隐身条件是否满足。
      * </p>
-     * 
+     *
      * @param player 服务器玩家
      */
     public static void activateStealth(ServerPlayer player) {
-        player.addEffect(new MobEffectInstance(ModEffects.BOND_VANISHING.get(), 6, 0, false, false, true));
+        player.addEffect(new MobEffectInstance(ModEffects.BOND_VANISHING.get(), STEALTH_DURATION_TICKS, 0, false, false, true));
     }
 
     /**

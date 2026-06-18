@@ -1,7 +1,6 @@
 {
   "required": false,
   "package": "com.luckgoose.goosecurios.mixin",
-  "plugin": "com.luckgoose.goosecurios.mixin.GooseCuriosMixinPlugin",
   "compatibilityLevel": "JAVA_17",
   "refmap": "goose_curios.refmap.json",
   "mixins": [

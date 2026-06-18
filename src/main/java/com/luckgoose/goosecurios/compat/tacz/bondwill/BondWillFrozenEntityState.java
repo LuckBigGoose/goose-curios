@@ -17,13 +17,13 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 羁绊邦德的意志 - 被冻结实体的状态保存
- * 
+ * 邦德的意志 - 被冻结实体的状态保存
+ *
  * <p>
  * 保存实体被时停冻结前的所有状态，以便在时停结束时恢复。
  * 包括位置、旋转、速度、AI状态、重力状态等。
  * </p>
- * 
+ *
  * <p><b>状态保存策略：</b></p>
  * <ul>
  *   <li>基础状态：位置、旋转、速度</li>
@@ -31,52 +31,57 @@ import java.util.UUID;
  *   <li>多部件实体：保存每个部件的状态（如末影龙）</li>
  *   <li>特殊实体：史莱姆的挤压动画</li>
  * </ul>
- * 
+ *
  * <p><b>弱引用设计：</b></p>
  * <p>
  * 使用WeakReference持有实体引用，如果实体已被卸载或死亡，
  * 弱引用会自动清除，避免内存泄漏。resolve()方法负责
  * 在需要时重新获取实体引用。
  * </p>
- * 
+ *
  * @author luckgoose
  * @see BondWillTimeStopManager 时停管理器
  */
 public class BondWillFrozenEntityState {
+    /** 时停拥有者UUID（用于多玩家时停时区分冻结实体归属，见 S1 修复） */
+    private final UUID owner;
+
     /** 实体UUID */
     private final UUID entityUuid;
-    
+
     /** 实体所在维度 */
     private final ResourceKey<Level> dimension;
-    
+
     /** 冻结前的速度 */
     private final Vec3 motion;
-    
+
     /** 实体姿态状态 */
     private final EntityPoseState pose;
-    
+
     /** 冻结前的AI状态（仅Mob） */
     private final boolean wasNoAi;
-    
+
     /** 冻结前的重力状态 */
     private final boolean hadNoGravity;
-    
+
     /** 多部件实体的部件姿态列表 */
     private final List<EntityPoseState> partPoses;
-    
+
     /** 实体的弱引用（避免内存泄漏） */
     private WeakReference<Entity> entityRef;
 
     /**
      * 构造冻结状态
-     * 
+     *
      * <p>
      * 捕获实体当前的所有状态。
      * </p>
-     * 
+     *
      * @param entity 要冻结的实体
+     * @param owner 触发时停的玩家UUID（用于多玩家时停时区分归属）
      */
-    public BondWillFrozenEntityState(Entity entity) {
+    public BondWillFrozenEntityState(Entity entity, UUID owner) {
+        this.owner = owner;
         this.entityUuid = entity.getUUID();
         this.dimension = entity.level().dimension();
         this.motion = entity.getDeltaMovement();
@@ -85,6 +90,10 @@ public class BondWillFrozenEntityState {
         this.hadNoGravity = entity.isNoGravity();
         this.partPoses = captureParts(entity);
         this.entityRef = new WeakReference<>(entity);
+    }
+
+    public UUID owner() {
+        return owner;
     }
 
     public UUID entityUuid() {
@@ -117,12 +126,12 @@ public class BondWillFrozenEntityState {
 
     /**
      * 解析实体引用
-     * 
+     *
      * <p>
      * 尝试从弱引用获取实体，如果失败则通过UUID从世界查找。
      * 找到后更新弱引用以供下次使用。
      * </p>
-     * 
+     *
      * @param level 服务器世界
      * @return 实体对象，如果不存在则为null
      */
@@ -136,11 +145,11 @@ public class BondWillFrozenEntityState {
 
     /**
      * 捕获多部件实体的所有部件姿态
-     * 
+     *
      * <p>
      * 用于末影龙等多部件实体。
      * </p>
-     * 
+     *
      * @param entity 实体
      * @return 部件姿态列表
      */
@@ -156,7 +165,7 @@ public class BondWillFrozenEntityState {
 
     /**
      * 实体姿态状态
-     * 
+     *
      * <p>
      * 保存实体的位置、旋转和特殊动画状态。
      * </p>
@@ -247,4 +256,3 @@ public class BondWillFrozenEntityState {
         }
     }
 }
-
