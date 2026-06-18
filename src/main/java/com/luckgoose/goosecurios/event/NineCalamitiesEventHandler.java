@@ -71,16 +71,16 @@ public class NineCalamitiesEventHandler {
     // ==================== NBT 键名 ====================
     
     /** NBT键：施法加成过期时间（游戏刻） */
-    private static final String CAST_BONUS_UNTIL = "goose_curiosNineCalamitiesCastBonusUntil";
-    
+    private static final String CAST_BONUS_UNTIL = "goose_curios.nine_calamities.cast_bonus_until";
+
     /** NBT键：已施放的法术流派列表 */
-    private static final String CAST_BONUS_TYPES = "goose_curiosNineCalamitiesCastBonusTypes";
-    
+    private static final String CAST_BONUS_TYPES = "goose_curios.nine_calamities.cast_bonus_types";
+
     /** NBT键：施法加成版本号（用于客户端同步） */
-    private static final String CAST_BONUS_VERSION = "goose_curiosNineCalamitiesCastBonusVersion";
-    
+    private static final String CAST_BONUS_VERSION = "goose_curios.nine_calamities.cast_bonus_version";
+
     /** NBT键：伤害锁定提示冷却时间 */
-    private static final String DAMAGE_LOCK_MESSAGE_COOLDOWN = "goose_curiosNineCalamitiesDamageLockMessageCooldown";
+    private static final String DAMAGE_LOCK_MESSAGE_COOLDOWN = "goose_curios.nine_calamities.damage_lock_cooldown";
     
     // ==================== 常量配置 ====================
     
@@ -142,8 +142,10 @@ public class NineCalamitiesEventHandler {
      *   <li>非手持魔杖 → 拦截伤害（防止近战击杀）</li>
      * </ol>
      * 
-     * <p>使用HIGH优先级确保在其他mod之前执行
-     * 
+     * <p>优先级说明：使用HIGH优先级，确保伤害锁定在其他mod的默认优先级处理器
+     * 之前生效——必须在伤害实际结算前取消，否则近战/铁魔法的伤害已经应用。
+     * 这会阻止后续较低优先级的伤害处理，是有意为之（本饰品限制只能用魔杖战斗）。
+     *
      * @param event 生物攻击事件
      */
     @SubscribeEvent(priority = EventPriority.HIGH)

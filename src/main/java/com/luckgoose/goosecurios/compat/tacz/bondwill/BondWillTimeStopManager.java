@@ -30,9 +30,9 @@ import java.util.UUID;
 
 /**
  * 邦德的意志时停效果管理器（服务端）
- * 
+ *
  * <p>管理时停效果的范围实例和被冻结的实体状态
- * 
+ *
  * <p>核心功能：
  * <ul>
  *   <li>时停实例管理：记录每个玩家的时停范围和持续时间</li>
@@ -40,16 +40,16 @@ import java.util.UUID;
  *   <li>实体扫描：定期扫描范围内的新实体并冻结</li>
  *   <li>状态同步：向客户端同步冻结状态，实现渲染冻结</li>
  * </ul>
- * 
+ *
  * <p>实现机制：
  * <ul>
  *   <li>通过Mixin取消被冻结实体的tick逻辑</li>
  *   <li>每tick锁定实体位置防止物理引擎推动</li>
  *   <li>使用实体过滤器减少50-70%的无效检查</li>
  * </ul>
- * 
+ *
  * <p>线程安全：服务端主线程运行，无并发问题
- * 
+ *
  * @author luckgoose
  * @see BondWillTimeStopInstance 时停范围实例
  * @see BondWillFrozenEntityState 冻结状态快照
@@ -57,10 +57,12 @@ import java.util.UUID;
  */
 public final class BondWillTimeStopManager {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(BondWillTimeStopManager.class);
+
     /** 活跃的时停实例:玩家UUID → 时停范围实例 */
     private static final Map<UUID, BondWillTimeStopInstance> INSTANCES = new HashMap<>();
-    
-    /** 被冻结的实体：实体UUID → 冻结状态快照 */
+
+    /** 被冻结的实体：实体UUID → 冻结状态快照（快照内含 owner UUID 以区分归属） */
     private static final Map<UUID, BondWillFrozenEntityState> FROZEN = new HashMap<>();
 
     private BondWillTimeStopManager() {
@@ -68,16 +70,16 @@ public final class BondWillTimeStopManager {
 
     /**
      * 添加或更新玩家的时停实例
-     * 
+     *
      * <p>修复：使用compute原子操作，如果实例已存在则更新位置
-     * 
+     *
      * @param player 触发时停的玩家
      */
     public static void addOrUpdateInstance(ServerPlayer player) {
         UUID uuid = player.getUUID();
         ResourceKey<Level> dimension = player.serverLevel().dimension();
         Vec3 position = player.position();
-        
+
         INSTANCES.compute(uuid, (id, existingInstance) -> {
             if (existingInstance != null) {
                 // 实例已存在，更新位置（玩家移动时）
@@ -92,23 +94,28 @@ public final class BondWillTimeStopManager {
 
     /**
      * 移除指定玩家的时停实例
-     * 
-     * <p>修复：移除实例时，同时解冻所有被该玩家冻结的实体
-     * 
+     *
+     * <p>S1 修复：只解冻属于该玩家的冻结实体，避免误解冻其他玩家时停的实体。
+     * 此前实现遍历并解冻全部 FROZEN，在多玩家同时停时会让先结束的一方
+     * 把另一方冻结的实体也解冻，造成 1~4 tick 的解冻间隙与视觉抖动。
+     *
      * @param player 玩家
      */
     public static void removeInstance(ServerPlayer player) {
         UUID playerUUID = player.getUUID();
         INSTANCES.remove(playerUUID);
-        
-        // 修复：解冻所有属于该玩家的冻结实体
-        System.out.println("[BondWill-TimeStop] Removing time stop for player " + player.getName().getString());
-        System.out.println("[BondWill-TimeStop] Currently frozen entities: " + FROZEN.size());
-        
-        java.util.Iterator<java.util.Map.Entry<UUID, BondWillFrozenEntityState>> iterator = FROZEN.entrySet().iterator();
+
+        LOGGER.debug("Removing time stop for player {}", player.getName().getString());
+        LOGGER.debug("Currently frozen entities: {}", FROZEN.size());
+
+        // S1 修复：仅解冻归属该玩家的实体，跳过其他玩家冻结的实体
+        Iterator<Map.Entry<UUID, BondWillFrozenEntityState>> iterator = FROZEN.entrySet().iterator();
         int unfrozenCount = 0;
         while (iterator.hasNext()) {
-            java.util.Map.Entry<UUID, BondWillFrozenEntityState> entry = iterator.next();
+            Map.Entry<UUID, BondWillFrozenEntityState> entry = iterator.next();
+            if (!playerUUID.equals(entry.getValue().owner())) {
+                continue;
+            }
             Entity entity = findEntity(player.server, entry.getValue());
             if (entity != null && entity.isAlive()) {
                 unfreezeEntity(entity, entry.getValue());
@@ -116,19 +123,19 @@ public final class BondWillTimeStopManager {
             }
             iterator.remove();
         }
-        
-        System.out.println("[BondWill-TimeStop] Unfroze " + unfrozenCount + " entities");
+
+        LOGGER.debug("Unfroze {} entities for player {}", unfrozenCount, playerUUID);
     }
 
     /**
      * 服务器Tick更新：管理时停效果
-     * 
+     *
      * <p>执行流程：
      * <ol>
      *   <li>锁定所有已冻结实体的位置（防止被物理引擎推动）</li>
      *   <li>根据配置的扫描间隔扫描范围内的新实体并冻结</li>
      * </ol>
-     * 
+     *
      * @param server 服务器实例
      */
     public static void serverTick(MinecraftServer server) {
@@ -144,9 +151,9 @@ public final class BondWillTimeStopManager {
 
     /**
      * 检查实体的tick是否应该被取消
-     * 
+     *
      * <p>由Mixin调用，阻止被冻结实体的正常tick逻辑执行
-     * 
+     *
      * @param entity 要检查的实体
      * @return true表示应该取消该实体的tick
      */
@@ -156,7 +163,7 @@ public final class BondWillTimeStopManager {
 
     /**
      * 清除所有时停实例和冻结状态
-     * 
+     *
      * @param server 服务器实例
      */
     public static void clear(MinecraftServer server) {
@@ -172,7 +179,7 @@ public final class BondWillTimeStopManager {
 
     /**
      * 更新冻结实体列表：扫描时停范围内的实体
-     * 
+     *
      * <p>性能优化：
      * <ul>
      *   <li>使用实体过滤器提前排除玩家、非生物、死亡实体</li>
@@ -181,7 +188,7 @@ public final class BondWillTimeStopManager {
      */
     private static void updateFrozenEntities(MinecraftServer server) {
         Set<UUID> shouldRemainFrozen = new HashSet<>();
-        
+
         // 高效的实体过滤器：提前过滤无关实体
         java.util.function.Predicate<Entity> entityFilter = entity -> {
             if (!(entity instanceof LivingEntity)) return false;
@@ -189,20 +196,20 @@ public final class BondWillTimeStopManager {
             if (!entity.isAlive()) return false;
             return true;
         };
-        
+
         for (BondWillTimeStopInstance instance : INSTANCES.values()) {
             ServerLevel level = server.getLevel(instance.dimension());
             if (level == null) continue;
             Vec3 center = instance.center();
             double radius = instance.radius();
             AABB area = new AABB(center.x - radius, center.y - radius, center.z - radius, center.x + radius, center.y + radius, center.z + radius);
-            
+
             // 使用过滤器版本的getEntities，减少50-70%的无效检查
             for (Entity entity : level.getEntities((Entity)null, area, entityFilter)) {
                 Entity target = normalizeFreezeTarget(entity);
                 if (!instance.contains(target) || !canFreeze(target, instance)) continue;
                 shouldRemainFrozen.add(target.getUUID());
-                freezeEntity(target);
+                freezeEntity(target, instance.owner());
             }
         }
         unfreezeEntitiesNoLongerAffected(server, shouldRemainFrozen);
@@ -237,9 +244,9 @@ public final class BondWillTimeStopManager {
         return id != null && "touhou_little_maid".equals(id.getNamespace()) && "maid".equals(id.getPath());
     }
 
-    private static void freezeEntity(Entity entity) {
+    private static void freezeEntity(Entity entity, UUID owner) {
         if (FROZEN.containsKey(entity.getUUID())) return;
-        BondWillFrozenEntityState state = new BondWillFrozenEntityState(entity);
+        BondWillFrozenEntityState state = new BondWillFrozenEntityState(entity, owner);
         FROZEN.put(entity.getUUID(), state);
         entity.setDeltaMovement(Vec3.ZERO);
         entity.setNoGravity(true);
@@ -266,6 +273,10 @@ public final class BondWillTimeStopManager {
     private static void lockFrozenEntity(Entity entity, BondWillFrozenEntityState state) {
         state.pose().lock(entity);
         entity.setNoGravity(true);
+        // 【有意设计】时停是"输出窗口"而非单纯控制：清零无敌帧让玩家在时停期间
+        // 对冻结实体造成满额高频伤害，配合 TACZ 高射速枪械实现爆发输出。
+        // hurtTime=0 同时清除受击红闪动画，保持冻结视觉的纯净。
+        // 注意：解冻时无需恢复 invulnerableTime/hurtTime，它们会在下一 tick 自然回归。
         entity.invulnerableTime = 0;
         if (entity instanceof LivingEntity living) {
             living.hurtTime = 0;
@@ -275,7 +286,7 @@ public final class BondWillTimeStopManager {
         }
         PartEntity<?>[] parts = entity.getParts();
         if (parts == null || parts.length == 0) return;
-        
+
         // 安全检查：确保parts和poses数量匹配，避免数组越界
         java.util.List<BondWillFrozenEntityState.EntityPoseState> poses = state.partPoses();
         int minLength = Math.min(parts.length, poses.size());
@@ -288,7 +299,7 @@ public final class BondWillTimeStopManager {
 
     /**
      * 锁定实体的部位（如末影龙的身体部分）
-     * 
+     *
      * @param part 实体部位，已确保非null
      * @param state 冻结状态
      * @param index 部位索引，已确保在范围内
@@ -330,4 +341,3 @@ public final class BondWillTimeStopManager {
         ModNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY.with(() -> entity), new BondWillFreezeSyncPacket(entity.getId(), entity.getUUID(), frozen, entity.getX(), entity.getY(), entity.getZ(), entity.getXRot(), entity.getYRot()));
     }
 }
-

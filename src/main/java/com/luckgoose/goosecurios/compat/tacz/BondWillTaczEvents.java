@@ -28,14 +28,14 @@ import java.util.UUID;
 
 /**
  * 邦德的意志物品的TACZ枪械模组兼容事件处理器
- * 
+ *
  * <p>实现核心游戏机制：
  * <ul>
  *   <li>隐身蓄力系统：脱战状态下累积伤害加成</li>
  *   <li>伤害加成应用：首次伤害触发，立即清空加成值</li>
  *   <li>时停效果触发：满蓄力时可触发范围时停</li>
  * </ul>
- * 
+ *
  * @author luckgoose
  * @see BondWillState 状态管理器
  * @see BondWillTimeStopManager 时停管理器
@@ -44,9 +44,18 @@ public class BondWillTaczEvents {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(BondWillTaczEvents.class);
 
+    /** 状态同步间隔（tick）：每 5 tick 向客户端同步一次，平衡实时性与带宽 */
+    private static final int SYNC_INTERVAL_TICKS = 5;
+
+    /** 过期数据清理间隔（tick）：每 30 分钟清理一次（36000 = 20tick/秒 × 60 × 30） */
+    private static final int CLEANUP_INTERVAL_TICKS = 36000;
+
+    /** 过期数据阈值（tick）：1 小时未活动则清理（72000 = 20tick/秒 × 60 × 60） */
+    private static final int STALE_DATA_THRESHOLD_TICKS = 72000;
+
     /**
      * 处理玩家每游戏刻的状态更新
-     * 
+     *
      * <p>执行流程：
      * <ol>
      *   <li>验证玩家是否装备邦德的意志</li>
@@ -69,13 +78,13 @@ public class BondWillTaczEvents {
         }
 
         int currentTick = player.server.getTickCount();
-        
+
         if (!canStealth(player, uuid, currentTick)) {
             if (BondWillTimeStopState.isTimeStopActive(uuid)) {
                 BondWillState.markRevealed(uuid, currentTick);
             }
             cancel(player, true);
-            if (currentTick % 5 == 0) {
+            if (currentTick % SYNC_INTERVAL_TICKS == 0) {
                 sync(player, false);
             }
             return;
@@ -84,20 +93,20 @@ public class BondWillTaczEvents {
         BondWillState.activateStealth(player);
         BondWillState.tickBonus(uuid, currentTick);
         tickTimeStop(player, uuid);
-        if (currentTick % 5 == 0) {
+        if (currentTick % SYNC_INTERVAL_TICKS == 0) {
             sync(player, true);
         }
     }
 
     /**
      * 处理枪械伤害事件，应用伤害加成或冷却惩罚
-     * 
+     *
      * <p>逻辑说明：
      * <ul>
      *   <li>有加成：伤害乘以(1 + 加成)，立即清空加成</li>
      *   <li>无加成且战斗中：伤害减少(冷却惩罚)</li>
      * </ul>
-     * 
+     *
      * @param event 枪械伤害事件
      */
     @SubscribeEvent
@@ -114,9 +123,9 @@ public class BondWillTaczEvents {
         int currentTick = player.server.getTickCount();
         double bonus = BondWillState.getBonus(uuid);
         boolean outOfCombat = BondWillState.isOutOfCombat(uuid, currentTick);
-        
+
         BondWillState.markDamageDealt(uuid, currentTick);
-        
+
         if (bonus <= 0.0D) {
             if (!outOfCombat) {
                 double multiplier = 1.0D - BondWillConfig.COOLDOWN_DAMAGE_REDUCTION.get();
@@ -125,20 +134,20 @@ public class BondWillTaczEvents {
             cancel(player, true);
             return;
         }
-        
+
         event.setBaseAmount((float) (event.getBaseAmount() * (1.0D + bonus)));
-        
+
         float progress = (float) BondWillState.getProgress(uuid);
         if (progress >= 0.999F) {
             ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new BondWillImpactPacket(player.getId(), progress));
         }
-        
+
         cancel(player, true);
     }
 
     /**
      * 处理生物受伤事件
-     * 
+     *
      * <p>玩家受到伤害或造成近战伤害时，打破隐身状态
      */
     @SubscribeEvent
@@ -212,10 +221,10 @@ public class BondWillTaczEvents {
             BondWillState.clear(player);
         }
     }
-    
+
     /**
      * 处理服务器Tick事件，定期清理离线玩家的过期数据
-     * 
+     *
      * <p>清理策略：每30分钟清理一次，移除超过1小时未活动的数据
      */
     @SubscribeEvent
@@ -223,17 +232,15 @@ public class BondWillTaczEvents {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
-        
+
         int currentTick = event.getServer().getTickCount();
-        
-        // 每30分钟清理一次（36000 tick = 20 tick/秒 × 60秒 × 30分钟）
-        if (currentTick % 36000 == 0) {
-            // 清理1小时未活动的数据（72000 tick = 20 × 60 × 60）
-            BondWillState.cleanupStaleData(currentTick, 72000);
-            CyberPsychosisState.cleanupStaleData(currentTick, 72000);
+
+        if (currentTick % CLEANUP_INTERVAL_TICKS == 0) {
+            BondWillState.cleanupStaleData(currentTick, STALE_DATA_THRESHOLD_TICKS);
+            CyberPsychosisState.cleanupStaleData(currentTick, STALE_DATA_THRESHOLD_TICKS);
         }
     }
-    
+
     /** 判断玩家是否满足隐身条件：持枪、瞄准、脱战 */
     private static boolean canStealth(ServerPlayer player, UUID uuid, int currentTick) {
         return IGun.mainhandHoldGun(player)
@@ -244,8 +251,8 @@ public class BondWillTaczEvents {
     /** 取消隐身、清空加成、清除时停，并同步到客户端 */
     private static void cancel(ServerPlayer player, boolean sync) {
         UUID uuid = player.getUUID();
-        boolean shouldSync = BondWillState.isStealthActive(player) 
-                          || BondWillState.getBonus(uuid) > 0.0D 
+        boolean shouldSync = BondWillState.isStealthActive(player)
+                          || BondWillState.getBonus(uuid) > 0.0D
                           || BondWillTimeStopState.isTimeStopActive(uuid);
         BondWillState.cancelStealth(player);
         BondWillState.clearBonus(uuid);
@@ -286,16 +293,16 @@ public class BondWillTaczEvents {
         boolean timeStopActive = BondWillTimeStopState.isTimeStopActive(uuid);
         float countdownProgress = timeStopActive ? BondWillTimeStopState.getCountdownProgress(uuid) : 0.0F;
         ModNetwork.CHANNEL.send(
-            PacketDistributor.PLAYER.with(() -> player), 
+            PacketDistributor.PLAYER.with(() -> player),
             new BondWillSyncPacket(
-                (float) BondWillState.getProgress(uuid), 
-                (float) BondWillState.getBonus(uuid), 
-                BondWillConfig.MAX_BONUS.get().floatValue(), 
-                active, 
-                equipped, 
-                cooldownTicks, 
-                timeStopActive, 
-                countdownProgress, 
+                (float) BondWillState.getProgress(uuid),
+                (float) BondWillState.getBonus(uuid),
+                BondWillConfig.MAX_BONUS.get().floatValue(),
+                active,
+                equipped,
+                cooldownTicks,
+                timeStopActive,
+                countdownProgress,
                 getEquippedSettings(player)
             )
         );

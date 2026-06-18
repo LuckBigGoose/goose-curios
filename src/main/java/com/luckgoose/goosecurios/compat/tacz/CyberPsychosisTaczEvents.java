@@ -38,8 +38,11 @@ public class CyberPsychosisTaczEvents {
      *   <li>触发失败：增加下次触发概率</li>
      * </ol>
      * 
-     * <p>注意：使用LOW优先级避免与其他mod的爆头逻辑冲突
-     * 
+     * <p>优先级说明：使用LOW优先级，在大多数默认优先级处理器之后执行，
+     * 确保本饰品的"累积概率爆头"机制能覆盖其他mod/原版的爆头判定结果
+     * （setHeadshot(false) 先清除原始判定，再按自身概率重新判定）。
+     * 若与其他爆头mod冲突，可考虑调整优先级或配置开关。
+     *
      * @param event 枪械伤害事件
      */
     @SubscribeEvent(priority = EventPriority.LOW)

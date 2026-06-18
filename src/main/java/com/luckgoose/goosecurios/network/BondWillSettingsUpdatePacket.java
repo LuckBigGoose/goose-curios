@@ -9,20 +9,29 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.network.NetworkEvent;
 import top.theillusivec4.curios.api.CuriosApi;
 
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 public class BondWillSettingsUpdatePacket {
-    
+
     /** 允许的设置键白名单，防止客户端注入非法数据 */
     private static final Set<String> ALLOWED_KEYS = Set.of(
-        "TimeStopDesaturation",
-        "TimeStopDistortion", 
-        "ShotSound",
-        "ShotEffect",
-        "HitboxDisplay"
+        BondWillSettings.TIME_STOP_DESATURATION,
+        BondWillSettings.TIME_STOP_DISTORTION,
+        BondWillSettings.SHOT_SOUND,
+        BondWillSettings.SHOT_EFFECT,
+        BondWillSettings.HITBOX_DISPLAY
     );
-    
+
+    /** 节流记录：玩家UUID → 上次处理时间戳（毫秒），防止高频发包 DoS（I5 修复） */
+    private static final Map<UUID, Long> LAST_UPDATE_MS = new ConcurrentHashMap<>();
+
+    /** 设置更新最小间隔（毫秒），200ms 内重复包被忽略 */
+    private static final long THROTTLE_MS = 200L;
+
     private final CompoundTag settings;
 
     public BondWillSettingsUpdatePacket(CompoundTag settings) {
@@ -41,9 +50,20 @@ public class BondWillSettingsUpdatePacket {
     public static void handle(BondWillSettingsUpdatePacket msg, Supplier<NetworkEvent.Context> ctx) {
         ServerPlayer player = ctx.get().getSender();
         if (player == null) {
+            ctx.get().setPacketHandled(true);
             return;
         }
-        
+
+        // I5 修复：节流防止恶意客户端高频发包造成 DoS（每次处理都会遍历背包/Curios + broadcastChanges）
+        UUID uuid = player.getUUID();
+        long now = System.currentTimeMillis();
+        Long last = LAST_UPDATE_MS.get(uuid);
+        if (last != null && now - last < THROTTLE_MS) {
+            ctx.get().setPacketHandled(true);
+            return;
+        }
+        LAST_UPDATE_MS.put(uuid, now);
+
         ctx.get().enqueueWork(() -> {
             // 安全验证:只允许白名单中的键,防止客户端注入恶意数据
             CompoundTag sanitizedSettings = sanitizeSettings(msg.settings);
@@ -51,10 +71,10 @@ public class BondWillSettingsUpdatePacket {
         });
         ctx.get().setPacketHandled(true);
     }
-    
+
     /**
      * 验证并清理客户端发送的设置，只保留白名单中的键
-     * 
+     *
      * @param input 客户端发送的原始设置
      * @return 清理后的安全设置
      */

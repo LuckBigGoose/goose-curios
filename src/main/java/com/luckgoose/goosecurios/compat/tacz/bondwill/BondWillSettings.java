@@ -22,12 +22,12 @@ import net.minecraft.world.item.ItemStack;
  * @author luckgoose
  */
 public final class BondWillSettings {
-    private static final String ROOT = "BondWillSettings";
-    private static final String TIME_STOP_DESATURATION = "TimeStopDesaturation";
-    private static final String TIME_STOP_DISTORTION = "TimeStopDistortion";
-    private static final String SHOT_SOUND = "ShotSound";
-    private static final String SHOT_EFFECT = "ShotEffect";
-    private static final String HITBOX_DISPLAY = "HitboxDisplay";
+    public static final String ROOT = "BondWillSettings";
+    public static final String TIME_STOP_DESATURATION = "TimeStopDesaturation";
+    public static final String TIME_STOP_DISTORTION = "TimeStopDistortion";
+    public static final String SHOT_SOUND = "ShotSound";
+    public static final String SHOT_EFFECT = "ShotEffect";
+    public static final String HITBOX_DISPLAY = "HitboxDisplay";
 
     private BondWillSettings() {
     }
