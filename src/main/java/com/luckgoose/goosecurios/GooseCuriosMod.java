@@ -44,8 +44,9 @@ public class GooseCuriosMod {
     private static final Logger LOGGER = LoggerFactory.getLogger(GooseCuriosMod.class);
 
     /**
-     * 构造函数
-     * 初始化流程：注册器 → 网络 → 配置 → 事件
+     * 构造函数：初始化模组
+     * 
+     * 执行顺序：注册器 → 网络 → 配置 → 事件
      */
     public GooseCuriosMod() {
         LOGGER.info("Initializing Goose Curios Mod v1.0.0");

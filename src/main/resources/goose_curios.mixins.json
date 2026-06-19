@@ -22,7 +22,6 @@
     "client.AnimationStateAccessor",
     "client.WardenClientAccessor",
     "client.BondWillEntityClientFreezeMixin",
-    "client.BondWillLevelRendererWeatherFreezeMixin",
     "client.BondWillEntityRenderDispatcherFreezeMixin",
     "client.BondWillLivingEntityRendererFreezeMixin",
     "client.BondWillEnderDragonRendererFreezeMixin"

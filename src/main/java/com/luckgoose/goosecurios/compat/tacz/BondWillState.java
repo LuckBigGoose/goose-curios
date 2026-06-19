@@ -2,9 +2,10 @@ package com.luckgoose.goosecurios.compat.tacz;
 
 import com.luckgoose.goosecurios.config.BondWillConfig;
 import com.luckgoose.goosecurios.init.ModEffects;
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffectInstance;
 
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -46,6 +47,32 @@ public class BondWillState {
     /** 最后暴露时间：玩家UUID → 游戏刻 */
     private static final ConcurrentMap<UUID, Integer> LAST_REVEAL_TICKS = new ConcurrentHashMap<>();
 
+    /** 加成消耗时间：玩家UUID → 消耗时的游戏刻（用于延迟清空，允许穿甲弹第二段也享受加成） */
+    private static final ConcurrentMap<UUID, Integer> BONUS_CONSUMED_TICK = new ConcurrentHashMap<>();
+
+    /** 加成清空延迟：延迟2 tick清空，允许穿甲弹两段伤害都享受加成 */
+    private static final int BONUS_CLEAR_DELAY_TICKS = 2;
+
+    /**
+     * 攻击追踪信息
+     * 用于判断玩家是否击杀了攻击目标（一击必杀不进战斗）
+     */
+    private static class AttackTracking {
+        /** 正在攻击的目标UUID集合 */
+        final Set<UUID> targets = ConcurrentHashMap.newKeySet();
+        /** 已击杀的目标UUID集合 */
+        final Set<UUID> killedTargets = ConcurrentHashMap.newKeySet();
+        /** 攻击开始时间 */
+        int startTick;
+        
+        AttackTracking(int tick) {
+            this.startTick = tick;
+        }
+    }
+
+    /** 攻击追踪：玩家UUID → 攻击追踪信息 */
+    private static final ConcurrentMap<UUID, AttackTracking> ATTACK_TRACKING = new ConcurrentHashMap<>();
+
     /** 检查玩家是否装备邦德的意志 */
     public static boolean isEquipped(UUID uuid) {
         return EQUIPPED_COUNTS.getOrDefault(uuid, 0) > 0;
@@ -84,27 +111,26 @@ public class BondWillState {
     /**
      * 判断玩家是否脱离战斗
      * 
-     * 【脱战条件】
-     * 距离最后一次战斗行为的时间 > OUT_OF_COMBAT_TICKS（默认200tick = 10秒）
+     * 脱战条件：距离最后一次战斗行为的时间超过配置阈值（默认100tick）
+     * 战斗行为包括造成伤害、受到伤害、被暴露（时停结束等）
      * 
-     * 战斗行为包括：
-     * - 造成伤害
-     * - 受到伤害
-     * - 被"暴露"（时停结束、伤害窗口超时等）
+     * 使用long类型计算避免tick溢出问题（服务器运行约50天后tick会溢出）
      * 
      * @param uuid 玩家UUID
      * @param currentTick 当前游戏刻
      * @return 是否脱战
      */
     public static boolean isOutOfCombat(UUID uuid, int currentTick) {
-        return currentTick - getLastCombatTick(uuid) > BondWillConfig.OUT_OF_COMBAT_TICKS.get();
+        int lastCombat = getLastCombatTick(uuid);
+        long elapsed = (long) currentTick - lastCombat;
+        return elapsed > BondWillConfig.OUT_OF_COMBAT_TICKS.get();
     }
 
     /**
      * 获取脱战冷却剩余时间
      * 
-     * 【用途】
      * 用于客户端HUD显示冷却进度条
+     * 使用long类型避免tick溢出
      * 
      * @param uuid 玩家UUID
      * @param currentTick 当前游戏刻
@@ -112,20 +138,26 @@ public class BondWillState {
      */
     public static int getCooldownTicks(UUID uuid, int currentTick) {
         int lastCombat = getLastCombatTick(uuid);
-        int elapsed = currentTick - lastCombat;
-        return Math.max(0, BondWillConfig.OUT_OF_COMBAT_TICKS.get() - elapsed + 1);
+        long elapsed = (long) currentTick - lastCombat;
+        long remaining = BondWillConfig.OUT_OF_COMBAT_TICKS.get() - elapsed + 1;
+        return (int) Math.max(0, Math.min(remaining, Integer.MAX_VALUE));
     }
+
+    /** 默认战斗时间戳，确保新玩家立即处于脱战状态 */
+    private static final int DEFAULT_COMBAT_TICK = Integer.MIN_VALUE / 2;
 
     /**
      * 获取最后一次战斗行为的时间
      * 
-     * 取三个时间戳的最大值，使用 Integer.MIN_VALUE / 2 作为默认值
-     * 避免使用 Integer.MIN_VALUE 防止后续计算溢出
+     * 取三个时间戳的最大值
+     * 
+     * @param uuid 玩家UUID
+     * @return 最后战斗时间戳
      */
     private static int getLastCombatTick(UUID uuid) {
-        int lastDealt = LAST_DAMAGE_DEALT_TICKS.getOrDefault(uuid, Integer.MIN_VALUE / 2);
-        int lastTaken = LAST_DAMAGE_TAKEN_TICKS.getOrDefault(uuid, Integer.MIN_VALUE / 2);
-        int lastReveal = LAST_REVEAL_TICKS.getOrDefault(uuid, Integer.MIN_VALUE / 2);
+        int lastDealt = LAST_DAMAGE_DEALT_TICKS.getOrDefault(uuid, DEFAULT_COMBAT_TICK);
+        int lastTaken = LAST_DAMAGE_TAKEN_TICKS.getOrDefault(uuid, DEFAULT_COMBAT_TICK);
+        int lastReveal = LAST_REVEAL_TICKS.getOrDefault(uuid, DEFAULT_COMBAT_TICK);
         return Math.max(Math.max(lastDealt, lastTaken), lastReveal);
     }
 
@@ -244,7 +276,7 @@ public class BondWillState {
         return player.hasEffect(ModEffects.BOND_VANISHING.get());
     }
 
-    /** 隐身效果持续tick数：每tick刷新，故实际持续取决于隐身条件是否满足 */
+    /** 隐身效果持续时长：每tick刷新，实际持续取决于隐身条件 */
     private static final int STEALTH_DURATION_TICKS = 6;
 
     /**
@@ -273,10 +305,8 @@ public class BondWillState {
     /**
      * 清除玩家的激活状态
      * 
-     * <p>
-     * 清除隐身效果和伤害加成，但保留装备计数和战斗时间戳。
-     * 在卸下装备时调用。
-     * </p>
+     * 清除隐身效果和伤害加成，但保留装备计数和战斗时间戳
+     * 在卸下装备时调用
      * 
      * @param player 服务器玩家
      */
@@ -285,6 +315,114 @@ public class BondWillState {
         cancelStealth(player);
         BONUSES.remove(uuid);
         LAST_BONUS_TICKS.remove(uuid);
+    }
+
+    /**
+     * 标记加成已消耗
+     * 
+     * 延迟2 tick清空加成，允许穿甲弹两段伤害都享受加成
+     * 
+     * @param uuid 玩家UUID
+     * @param tick 消耗时的游戏刻
+     */
+    public static void markBonusConsumed(UUID uuid, int tick) {
+        BONUS_CONSUMED_TICK.put(uuid, tick);
+    }
+
+    /**
+     * 获取加成消耗时间
+     * 
+     * @param uuid 玩家UUID
+     * @return 消耗时的游戏刻，未消耗返回null
+     */
+    public static Integer getBonusConsumedTick(UUID uuid) {
+        return BONUS_CONSUMED_TICK.get(uuid);
+    }
+
+    /**
+     * 清除加成消耗标记
+     * 
+     * @param uuid 玩家UUID
+     */
+    public static void clearBonusConsumed(UUID uuid) {
+        BONUS_CONSUMED_TICK.remove(uuid);
+    }
+
+    /**
+     * 清理战斗历史记录
+     * 
+     * 在完美击杀后调用，清除所有战斗标记，奖励玩家立即脱战
+     * 这是对"刺客"玩法的奖励机制：一击必杀，无痕无踪
+     * 
+     * @param uuid 玩家UUID
+     */
+    public static void clearCombatHistory(UUID uuid) {
+        LAST_DAMAGE_DEALT_TICKS.remove(uuid);
+        LAST_DAMAGE_TAKEN_TICKS.remove(uuid);
+        LAST_REVEAL_TICKS.remove(uuid);
+    }
+
+    /**
+     * 标记玩家正在攻击目标
+     * 
+     * 用于击杀判定：如果目标在2 tick内死亡，视为一击必杀
+     * 
+     * @param playerUuid 玩家UUID
+     * @param targetUuid 目标实体UUID
+     * @param tick 当前游戏刻
+     */
+    public static void markAttacking(UUID playerUuid, UUID targetUuid, int tick) {
+        AttackTracking tracking = ATTACK_TRACKING.computeIfAbsent(playerUuid, k -> new AttackTracking(tick));
+        tracking.targets.add(targetUuid);
+    }
+
+    /**
+     * 检查玩家是否正在攻击指定目标
+     * 
+     * @param playerUuid 玩家UUID
+     * @param targetUuid 目标实体UUID
+     * @return 是否正在攻击该目标
+     */
+    public static boolean isAttackingTarget(UUID playerUuid, UUID targetUuid) {
+        AttackTracking tracking = ATTACK_TRACKING.get(playerUuid);
+        return tracking != null && tracking.targets.contains(targetUuid);
+    }
+
+    /**
+     * 标记玩家击杀了目标
+     * 
+     * 在实体死亡事件中调用
+     * 
+     * @param playerUuid 玩家UUID
+     * @param targetUuid 目标实体UUID
+     */
+    public static void markKilledTarget(UUID playerUuid, UUID targetUuid) {
+        AttackTracking tracking = ATTACK_TRACKING.get(playerUuid);
+        if (tracking != null) {
+            tracking.killedTargets.add(targetUuid);
+        }
+    }
+
+    /**
+     * 检查玩家是否在本次攻击中击杀了目标
+     * 
+     * @param playerUuid 玩家UUID
+     * @return 是否击杀了目标（一击必杀）
+     */
+    public static boolean hasKilledRecently(UUID playerUuid) {
+        AttackTracking tracking = ATTACK_TRACKING.get(playerUuid);
+        return tracking != null && !tracking.killedTargets.isEmpty();
+    }
+
+    /**
+     * 清除攻击追踪信息
+     * 
+     * 在延迟清空完成后调用
+     * 
+     * @param playerUuid 玩家UUID
+     */
+    public static void clearAttackTracking(UUID playerUuid) {
+        ATTACK_TRACKING.remove(playerUuid);
     }
 
     /**
@@ -309,17 +447,12 @@ public class BondWillState {
     /**
      * 定期清理过期数据，防止内存泄漏
      * 
-     * 【清理策略】
+     * 清理策略：
      * 1. 清理超过阈值时间未更新的时间戳记录
      * 2. 清理已卸下装备但仍有加成数据的玩家
      * 
-     * 【调用频率】
-     * 由 BondWillTaczEvents 每60秒调用一次
+     * 调用频率：由 BondWillTaczEvents 每60秒调用一次
      * 阈值默认为5分钟（6000 tick）
-     * 
-     * 【原因】
-     * 如果不清理，离线玩家的数据会永久占用内存，
-     * 长时间运行的服务器会逐渐消耗大量内存
      * 
      * @param currentTick 当前游戏刻
      * @param staleThreshold 过期阈值（tick）
@@ -338,6 +471,17 @@ public class BondWillState {
         LAST_BONUS_TICKS.entrySet().removeIf(
             entry -> currentTick - entry.getValue() > staleThreshold
         );
+        
+        // 清理过期的加成消耗标记
+        BONUS_CONSUMED_TICK.entrySet().removeIf(
+            entry -> currentTick - entry.getValue() > staleThreshold
+        );
+        
+        // 清理过期的攻击追踪
+        ATTACK_TRACKING.entrySet().removeIf(
+            entry -> currentTick - entry.getValue().startTick > staleThreshold
+        );
+        
         // 清理没有装备但仍有数据的UUID（玩家已卸下装备）
         BONUSES.keySet().removeIf(uuid -> !EQUIPPED_COUNTS.containsKey(uuid));
     }

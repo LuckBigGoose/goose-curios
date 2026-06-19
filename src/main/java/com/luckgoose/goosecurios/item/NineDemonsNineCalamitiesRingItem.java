@@ -1,6 +1,8 @@
 package com.luckgoose.goosecurios.item;
 
 import com.luckgoose.goosecurios.config.NineCalamitiesConfig;
+import com.luckgoose.goosecurios.util.ClientUtils;
+import com.luckgoose.goosecurios.util.ComponentUtils;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
@@ -79,28 +81,72 @@ public class NineDemonsNineCalamitiesRingItem extends Item implements ICurioItem
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.lore").withStyle(ChatFormatting.DARK_PURPLE));
+        // Lore 装饰文字
+        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.lore.1"));
+        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.lore.2"));
+        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.lore.3")); // 空行
+        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.oath"));
         tooltip.add(Component.empty());
-        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.oath.1").withStyle(ChatFormatting.RED));
-        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.oath.2").withStyle(ChatFormatting.RED));
-        tooltip.add(Component.empty());
-        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.effect.1").withStyle(ChatFormatting.GOLD));
-        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.effect.1.detail", percent(NineCalamitiesConfig.FIRST_WAND_BONUS_PERCENT.get()), percent(NineCalamitiesConfig.BONUS_DECAY_PER_WAND_PERCENT.get())).withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.empty());
-        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.effect.2").withStyle(ChatFormatting.GOLD));
-        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.effect.2.detail", percent(NineCalamitiesConfig.CAST_BONUS_PER_WAND_PERCENT.get()), seconds(NineCalamitiesConfig.CAST_BONUS_DURATION_TICKS.get())).withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.empty());
-        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.hold_shift.prefix").withStyle(ChatFormatting.DARK_GRAY)
-                .append(Component.translatable("tooltip.goose_curios.nine_calamities.hold_shift.key").withStyle(ChatFormatting.AQUA))
-                .append(Component.translatable("tooltip.goose_curios.nine_calamities.hold_shift.suffix").withStyle(ChatFormatting.DARK_GRAY)));
+        
+        // 如果按住Shift，显示详细信息
+        if (level != null && level.isClientSide && isShiftKeyDownClient()) {
+            addDetailedEffects(tooltip);
+        } else {
+            // 简略版本 - 只显示能力名称
+            tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.ability.1"));
+            tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.ability.2"));
+            tooltip.add(Component.empty());
+            // 提示信息 - 仅在未按 Shift 时显示
+            tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.hold_shift"));
+        }
     }
-
-    private static String percent(double value) {
-        return String.format(Locale.ROOT, "%.2f", value);
+    
+    /**
+     * 检测Shift键是否按下（客户端专用）
+     * 
+     * @return Shift键是否按下
+     */
+    private static boolean isShiftKeyDownClient() {
+        return net.minecraftforge.fml.loading.FMLEnvironment.dist.isClient()
+            && ClientUtils.isShiftKeyDown();
     }
-
-    private static String seconds(int ticks) {
-        return String.format(Locale.ROOT, "%.2f", ticks / 20.0D);
+    
+    /**
+     * 添加详细效果描述（按住Shift时显示）
+     */
+    private void addDetailedEffects(List<Component> tooltip) {
+        // 能力1：魔杖共鸣
+        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.ability.1"));
+        
+        // 获取真实的玩家数据
+        int currentWands = 0;
+        double currentBonus = 0.0;
+        int maxWands = NineCalamitiesConfig.MAX_WANDS.get();
+        
+        // 在客户端且有玩家时获取实时数据
+        if (net.minecraftforge.fml.loading.FMLEnvironment.dist.isClient()) {
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc.player != null) {
+                currentWands = com.luckgoose.goosecurios.event.NineCalamitiesEventHandler.getWandTypeCount(mc.player);
+                currentBonus = com.luckgoose.goosecurios.event.NineCalamitiesEventHandler.getBaseBonus(mc.player) * 100.0;
+            }
+        }
+        
+        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.ability.1.detail1",
+                ComponentUtils.gold(currentWands), ComponentUtils.gold(maxWands), ComponentUtils.gold(String.format(Locale.ROOT, "%.2f", currentBonus))));
+        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.ability.1.detail2",
+                ComponentUtils.percent(NineCalamitiesConfig.FIRST_WAND_BONUS_PERCENT.get()),
+                ComponentUtils.percent(NineCalamitiesConfig.BONUS_DECAY_PER_WAND_PERCENT.get()),
+                ComponentUtils.percent(NineCalamitiesConfig.MIN_WAND_BONUS_PERCENT.get())));
+        tooltip.add(Component.empty());
+        
+        // 能力2：施法共振
+        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.ability.2"));
+        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.ability.2.detail1",
+                ComponentUtils.seconds(NineCalamitiesConfig.CAST_BONUS_DURATION_TICKS.get())));
+        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.ability.2.detail2"));
+        tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.ability.2.detail3",
+                ComponentUtils.percent(NineCalamitiesConfig.CAST_BONUS_PER_WAND_PERCENT.get())));
     }
 }
 

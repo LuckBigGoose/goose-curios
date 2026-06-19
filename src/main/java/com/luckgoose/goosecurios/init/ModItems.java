@@ -28,11 +28,11 @@ public class ModItems {
 
     /** 赛博精神病戒指 */
     public static final RegistryObject<Item> CYBER_PSYCHOSIS = ITEMS.register("cyber_psychosis",
-            () -> new CyberPsychosisItem(new Item.Properties().stacksTo(1).rarity(Rarity.EPIC)));
+            () -> new CyberPsychosisItem(new Item.Properties().stacksTo(1)));
 
     /** 邦德的意志戒指 */
     public static final RegistryObject<Item> BOND_WILL = ITEMS.register("bond_will",
-            () -> new BondWillItem(new Item.Properties().stacksTo(1).rarity(Rarity.EPIC)));
+            () -> new BondWillItem(new Item.Properties().stacksTo(1)));
 
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);

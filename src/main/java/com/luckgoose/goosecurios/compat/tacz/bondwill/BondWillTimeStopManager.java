@@ -124,7 +124,8 @@ public final class BondWillTimeStopManager {
             iterator.remove();
         }
 
-        LOGGER.debug("Unfroze {} entities for player {}", unfrozenCount, playerUUID);
+        LOGGER.info("Removed time stop for player {}, unfroze {} entities", 
+            player.getName().getString(), unfrozenCount);
     }
 
     /**
@@ -287,11 +288,11 @@ public final class BondWillTimeStopManager {
         PartEntity<?>[] parts = entity.getParts();
         if (parts == null || parts.length == 0) return;
 
-        // 安全检查：确保parts和poses数量匹配，避免数组越界
+        // 安全检查：确保parts和poses数量匹配，并验证元素非空
         java.util.List<BondWillFrozenEntityState.EntityPoseState> poses = state.partPoses();
         int minLength = Math.min(parts.length, poses.size());
         for (int i = 0; i < minLength; i++) {
-            if (parts[i] != null) {
+            if (parts[i] != null && poses.get(i) != null) {
                 lockPart(parts[i], state, i);
             }
         }

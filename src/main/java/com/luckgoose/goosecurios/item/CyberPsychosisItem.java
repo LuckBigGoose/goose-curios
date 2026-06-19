@@ -1,6 +1,8 @@
 package com.luckgoose.goosecurios.item;
 
 import com.luckgoose.goosecurios.config.CyberPsychosisConfig;
+import com.luckgoose.goosecurios.util.ClientUtils;
+import com.luckgoose.goosecurios.util.ComponentUtils;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
@@ -55,28 +57,56 @@ public class CyberPsychosisItem extends Item implements ICurioItem {
     }
 
     @Override
+    public Component getName(ItemStack stack) {
+        return super.getName(stack).copy().withStyle(ChatFormatting.RED);
+    }
+
+    @Override
     public boolean canEquipFromUse(SlotContext slotContext, ItemStack stack) {
         return true;
     }
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.lore.1").withStyle(ChatFormatting.DARK_PURPLE));
-        tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.lore.2").withStyle(ChatFormatting.LIGHT_PURPLE));
+        // Lore 装饰文字
+        tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.lore.1"));
+        tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.lore.2"));
+        tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.lore.3")); // 空行
+        tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.effect.1"));
         tooltip.add(Component.empty());
-        tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.effect.1").withStyle(ChatFormatting.AQUA));
-        tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.effect.2", percent(CyberPsychosisConfig.INITIAL_CHANCE.get(), ChatFormatting.RED)).withStyle(ChatFormatting.GOLD));
-        tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.effect.3", percent(CyberPsychosisConfig.CHANCE_INCREMENT.get(), ChatFormatting.LIGHT_PURPLE), percent(CyberPsychosisConfig.MAX_CHANCE.get(), ChatFormatting.YELLOW)).withStyle(ChatFormatting.LIGHT_PURPLE));
-        tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.effect.4", percent(CyberPsychosisConfig.INITIAL_CHANCE.get(), ChatFormatting.RED)).withStyle(ChatFormatting.RED));
-        tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.effect.5", seconds(CyberPsychosisConfig.RESET_AFTER_TICKS.get(), ChatFormatting.AQUA)).withStyle(ChatFormatting.DARK_AQUA));
+        
+        // 如果按住Shift，显示详细信息
+        if (level != null && level.isClientSide && isShiftKeyDownClient()) {
+            addDetailedEffects(tooltip);
+        } else {
+            // 提示信息 - 仅在未按 Shift 时显示
+            tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.hold_shift"));
+        }
     }
-
-    private static Component percent(double value, ChatFormatting formatting) {
-        return Component.literal(String.format(Locale.ROOT, "%.2f", value * 100.0D)).withStyle(formatting);
+    
+    /**
+     * 检测Shift键是否按下（客户端专用）
+     * 
+     * @return Shift键是否按下
+     */
+    private static boolean isShiftKeyDownClient() {
+        return net.minecraftforge.fml.loading.FMLEnvironment.dist.isClient()
+            && ClientUtils.isShiftKeyDown();
     }
-
-    private static Component seconds(int ticks, ChatFormatting formatting) {
-        return Component.literal(String.format(Locale.ROOT, "%.2f", ticks / 20.0D)).withStyle(formatting);
+    
+    /**
+     * 添加详细效果描述（按住Shift时显示）
+     */
+    private void addDetailedEffects(List<Component> tooltip) {
+        tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.effect.2", 
+                ComponentUtils.percent(CyberPsychosisConfig.INITIAL_CHANCE.get())));
+        tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.effect.2.detail1", 
+                ComponentUtils.percent(CyberPsychosisConfig.CHANCE_INCREMENT.get()), 
+                ComponentUtils.percent(CyberPsychosisConfig.MAX_CHANCE.get())));
+        tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.effect.2.detail2", 
+                ComponentUtils.percent(CyberPsychosisConfig.INITIAL_CHANCE.get())));
+        tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.effect.3", 
+                ComponentUtils.seconds(CyberPsychosisConfig.RESET_AFTER_TICKS.get())));
     }
 }
 

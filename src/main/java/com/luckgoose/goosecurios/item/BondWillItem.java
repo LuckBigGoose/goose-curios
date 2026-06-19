@@ -5,21 +5,16 @@ import com.luckgoose.goosecurios.compat.tacz.bondwill.BondWillSettings;
 import com.luckgoose.goosecurios.config.BondWillConfig;
 import com.luckgoose.goosecurios.network.BondWillSyncPacket;
 import com.luckgoose.goosecurios.network.ModNetwork;
+import com.luckgoose.goosecurios.util.ClientUtils;
+import com.luckgoose.goosecurios.util.ComponentUtils;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResultHolder;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
 import top.theillusivec4.curios.api.SlotContext;
 import top.theillusivec4.curios.api.type.capability.ICurioItem;
 
@@ -59,6 +54,11 @@ public class BondWillItem extends Item implements ICurioItem {
     }
 
     @Override
+    public Component getName(ItemStack stack) {
+        return super.getName(stack).copy().withStyle(ChatFormatting.RED);
+    }
+
+    @Override
     public boolean canEquipFromUse(SlotContext slotContext, ItemStack stack) {
         return true;
     }
@@ -71,56 +71,43 @@ public class BondWillItem extends Item implements ICurioItem {
      * - 按住Shift：显示详细效果描述，包含配置文件中的具体数值
      * 
      * 【提示内容】
-     * 1. 潜行隐身：脱战+瞄准触发隐身
-     * 2. 伤害累积：隐身时每秒增加伤害加成，显示具体数值
-     * 3. 时停效果：伤害加成达到阈值时触发时停
-     * 4. 冷却惩罚：未满蓄力时开火的伤害惩罚
+     * 1. 阴影中的幽灵：瞄准时获得隐匿
+     * 2. 耐心者的馈赠：静候时获得增伤
+     * 3. 谢幕前的完美：蓄满时获得屏息
+     * 4. 失手后的代价：暴露时获得破绽
      */
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
-        // 标题装饰
-        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.lore.1")
-                .withStyle(ChatFormatting.DARK_PURPLE));
-        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.lore.2")
-                .withStyle(ChatFormatting.LIGHT_PURPLE));
-        tooltip.add(Component.empty());
-        
-        // 效果标题
-        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.effect.title"));
-        tooltip.add(Component.empty());
+        // Lore 装饰文字
+        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.lore.1"));
+        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.lore.2"));
+        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.lore.2a")); // 空行
+        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.lore.3"));
+        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.lore.4")); // 空行
         
         // 如果按住Shift，显示详细信息
         if (level != null && level.isClientSide && isShiftKeyDownClient()) {
             addDetailedEffects(tooltip);
         } else {
-            // 简略版本
-            tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.effect.1"));
-            tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.effect.2"));
-            tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.effect.3"));
-            tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.effect.4"));
+            // 简略版本 - 只显示能力名称
+            tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.ability.1"));
+            tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.ability.2"));
+            tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.ability.3"));
+            tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.ability.4"));
             tooltip.add(Component.empty());
-            tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.hold_shift")
-                    .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
+            // 提示信息 - 仅在未按 Shift 时显示
+            tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.hold_shift"));
         }
-        
-        tooltip.add(Component.empty());
-        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.settings"));
     }
     
     /**
      * 检测Shift键是否按下（客户端专用）
      * 
-     * 【实现细节】
-     * - 使用GLFW直接检测键盘状态，同时检测左右Shift
-     * - 必须在客户端环境下执行，服务器环境直接返回false
+     * @return Shift键是否按下
      */
     private static boolean isShiftKeyDownClient() {
-        if (!net.minecraftforge.fml.loading.FMLEnvironment.dist.isClient()) {
-            return false;
-        }
-        long window = Minecraft.getInstance().getWindow().getWindow();
-        return GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS
-                || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS;
+        return net.minecraftforge.fml.loading.FMLEnvironment.dist.isClient() 
+            && ClientUtils.isShiftKeyDown();
     }
 
     /**
@@ -131,34 +118,35 @@ public class BondWillItem extends Item implements ICurioItem {
      * - OUT_OF_COMBAT_TICKS: 脱战判定时间
      * - BONUS_PER_SECOND: 每秒伤害加成增长率
      * - MAX_BONUS: 最大伤害加成
-     * - AIMING_PROGRESS_THRESHOLD: 触发隐身的瞄准进度阈值
+     * - TIME_STOP_RADIUS: 时停范围
+     * - TIME_STOP_DURATION: 时停持续时间
      * - COOLDOWN_DAMAGE_REDUCTION: 冷却期间的伤害削减
      */
     private void addDetailedEffects(List<Component> tooltip) {
-        // 第一条：潜行隐身
-        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.effect.1"));
-        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.effect.1.detail"));
+        // 能力1：阴影中的幽灵
+        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.ability.1"));
+        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.ability.1.detail"));
         tooltip.add(Component.empty());
         
-        // 第二条：伤害累积
-        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.effect.2"));
-        int outOfCombatSeconds = BondWillConfig.OUT_OF_COMBAT_TICKS.get() / 20;
-        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.effect.2.detail",
-                outOfCombatSeconds,
-                percent(BondWillConfig.BONUS_PER_SECOND.get(), ChatFormatting.RED),
-                percent(BondWillConfig.MAX_BONUS.get(), ChatFormatting.YELLOW)));
+        // 能力2：耐心者的馈赠
+        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.ability.2"));
+        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.ability.2.detail",
+                ComponentUtils.percent(BondWillConfig.BONUS_PER_SECOND.get()),
+                ComponentUtils.percent(BondWillConfig.MAX_BONUS.get())));
         tooltip.add(Component.empty());
         
-        // 第三条：时停
-        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.effect.3"));
-        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.effect.3.detail",
-                percent(BondWillConfig.AIMING_PROGRESS_THRESHOLD.get(), ChatFormatting.YELLOW)));
+        // 能力3：谢幕前的完美
+        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.ability.3"));
+        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.ability.3.detail",
+                ComponentUtils.gold(BondWillConfig.TIME_STOP_RADIUS.get().intValue()),
+                ComponentUtils.gold(String.format(Locale.ROOT, "%.2f", BondWillConfig.TIME_STOP_DURATION.get() / 20.0))));
         tooltip.add(Component.empty());
         
-        // 第四条：冷却惩罚
-        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.effect.4"));
-        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.effect.4.detail",
-                percent(BondWillConfig.COOLDOWN_DAMAGE_REDUCTION.get(), ChatFormatting.RED)));
+        // 能力4：失手后的代价
+        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.ability.4"));
+        tooltip.add(Component.translatable("tooltip.goose_curios.bond_will.ability.4.detail",
+                ComponentUtils.percent(BondWillConfig.COOLDOWN_DAMAGE_REDUCTION.get()),
+                ComponentUtils.gold(String.format(Locale.ROOT, "%.2f", BondWillConfig.OUT_OF_COMBAT_TICKS.get() / 20.0))));
     }
 
     /**
@@ -227,10 +215,5 @@ public class BondWillItem extends Item implements ICurioItem {
             player.connection.connection,
             net.minecraftforge.network.NetworkDirection.PLAY_TO_CLIENT
         );
-    }
-
-    private static Component percent(double value, ChatFormatting formatting) {
-        return Component.literal(String.format(Locale.ROOT, "%.0f", value * 100.0D) + "%")
-                .withStyle(formatting);
     }
 }

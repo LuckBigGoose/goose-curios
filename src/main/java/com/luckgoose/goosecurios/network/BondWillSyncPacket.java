@@ -7,39 +7,21 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.function.Supplier;
 
 /**
  * 邦德的意志状态同步网络包
  *
- * <p>用于将服务端的邦德的意志状态同步到客户端，用于UI显示
- *
- * <p>包含字段：
- * <ul>
- *   <li>progress：蓄力进度（0.0-1.0）</li>
- *   <li>bonus：当前伤害加成百分比</li>
- *   <li>maxBonus：最大伤害加成百分比</li>
- *   <li>active：是否处于隐身状态</li>
- *   <li>equipped：是否装备邦德的意志</li>
- *   <li>cooldownTicks：冷却剩余时间（游戏刻）</li>
- *   <li>timeStopActive：时停是否激活</li>
- *   <li>timeStopCountdownProgress：时停倒计时进度（0.0-1.0）</li>
- *   <li>settings：客户端显示设置（特效开关）</li>
- * </ul>
- *
- * <p>性能优化：
- * <ul>
- *   <li>使用VarInt压缩整数（cooldownTicks），通常1-2字节</li>
- *   <li>直接序列化布尔值而非NBT，从~100字节降至26字节（-79%）</li>
- * </ul>
- *
- * <p>网络大小：约26字节（4个float + 8个boolean + 1个VarInt）
+ * 用于将服务端状态同步到客户端，用于UI显示
  *
  * @author luckgoose
- * @see ClientPacketHandlers#handleBondWill
  */
 public class BondWillSyncPacket {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(BondWillSyncPacket.class);
 
     /** 蓄力进度：0.0（未蓄力）到1.0（满蓄力） */
     private final float progress;
@@ -171,12 +153,12 @@ public class BondWillSyncPacket {
     }
 
     /**
-     * 从字节缓冲区反序列化网络包
-     *
-     * <p>G2 修复：设置字段键名复用 {@link BondWillSettings} 常量
-     *
-     * @param buf 字节缓冲区
-     * @return 网络包实例
+     * 从网络缓冲区解码数据包
+     * 
+     * 读取顺序必须与encode()严格一致
+     * 
+     * @param buf 网络缓冲区
+     * @return 解码后的数据包
      */
     public static BondWillSyncPacket decode(FriendlyByteBuf buf) {
         float progress = buf.readFloat();
@@ -187,16 +169,19 @@ public class BondWillSyncPacket {
         int cooldownTicks = buf.readVarInt();
         boolean timeStopActive = buf.readBoolean();
         float timeStopCountdownProgress = buf.readFloat();
-
+        
+        // 读取settings：与encode()中的5个布尔值对应
         CompoundTag rootSettings = new CompoundTag();
         CompoundTag bondWillSettings = new CompoundTag();
+        
         bondWillSettings.putBoolean(BondWillSettings.TIME_STOP_DESATURATION, buf.readBoolean());
         bondWillSettings.putBoolean(BondWillSettings.TIME_STOP_DISTORTION, buf.readBoolean());
         bondWillSettings.putBoolean(BondWillSettings.SHOT_SOUND, buf.readBoolean());
         bondWillSettings.putBoolean(BondWillSettings.SHOT_EFFECT, buf.readBoolean());
         bondWillSettings.putBoolean(BondWillSettings.HITBOX_DISPLAY, buf.readBoolean());
+        
         rootSettings.put(BondWillSettings.ROOT, bondWillSettings);
-
+        
         return new BondWillSyncPacket(progress, bonus, maxBonus, active, equipped, cooldownTicks, timeStopActive, timeStopCountdownProgress, rootSettings);
     }
 
