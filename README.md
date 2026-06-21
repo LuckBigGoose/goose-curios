@@ -1,54 +1,32 @@
 # Goose Curios
 
-一个为 Minecraft 1.20.1 Forge 制作的 Curios 饰品模组。
+Goose Curios 是一个面向 Minecraft 1.20.1 Forge 的 Curios 饰品模组，提供与 TACZ、Goety 联动的特殊饰品机制。
 
-## 简介
+## 饰品
 
-添加了三种饰品，分别与 TACZ 和 Goety 模组联动。
+### 承载着邦德的意志
 
-### 饰品列表
+与 TACZ 联动的饰品。持枪瞄准时可进入隐匿表现，脱战后累积伤害加成，并可在满足条件时触发时停相关效果。该饰品支持在背包中右键打开设置界面。
 
-**承载着邦德的意志（Bond Will）**
-- 与 TACZ 联动的特工主题饰品
-- 持枪瞄准时隐身
-- 脱战后累积伤害加成
-- 满值瞄准时触发时停效果
-- 可在背包右键打开设置界面
+### 九魔·九厄
 
-**九魔·九厄（Nine Calamities）**
-- 与 Goety 联动的巫法饰品
-- 佩戴后只能使用诡厄巫法魔杖战斗
-- 快捷栏内每种魔杖提供伤害加成
-- 施放对应派系聚晶后获得临时加成
+与 Goety 联动的饰品。佩戴后围绕诡厄巫法魔杖构建战斗收益，快捷栏内不同魔杖可提供伤害加成，施放对应派系聚晶后可获得临时强化。
 
-**赛博精神病（Cyber Psychosis）**
-- 与 TACZ 联动的枪械饰品
-- 改变爆头判定为累积概率触发
-- 每次未触发会提高下次概率
+### 赛博精神病
+
+与 TACZ 联动的饰品。将爆头收益调整为累积概率触发机制，未触发时提高后续触发概率。
 
 ## 依赖
 
-必需模组：
 - Minecraft 1.20.1
 - Forge 47.3.0+
-- Curios API 5.14.1+
+- Curios API 5.x
 - Goety 2.5.0+
 - TACZ 1.1.4+
 
-依赖链接：
-- [Curios API](https://github.com/TheIllusiveC4/Curios/tree/1.20.x)
-- [Goety 2](https://github.com/Polarice3/Goety-2)
-- [TACZ](https://github.com/MCModderAnchor/TACZ)
-
-## 安装
-
-1. 安装 Forge 1.20.1-47.3.0+
-2. 下载并安装所有依赖模组
-3. 将本模组放入 mods 文件夹
-
 ## 配置
 
-配置文件位于 `.minecraft/config/goose/goose-curios/` 目录。
+配置文件位于 `.minecraft/config/goose/goose-curios/`。客户端表现、饰品数值与联动行为可按配置项调整。
 
 ## 构建
 
@@ -58,18 +36,23 @@ cd goose-curios
 ./gradlew build
 ```
 
-**注意**：构建前需要手动下载以下依赖并放入 `libs/` 目录：
-- `goety-2.5.36.1-new_texture.jar`
-- `tacz-1.20.1-1.1.4-hotfix-all.jar`
+Windows 可使用：
 
-## 贡献
+```powershell
+.\gradlew.bat build
+```
 
-欢迎提交 Issue 和 Pull Request。
+构建前需要将以下依赖放入 `libs/` 目录：
+
+```text
+goety-2.5.36.1-new_texture.jar
+tacz-1.20.1-1.1.4-hotfix-all.jar
+```
+
+## 反馈与贡献
+
+欢迎通过 Issue 反馈问题、兼容性异常或平衡性建议。提交 Pull Request 时，请说明修改范围、测试环境和验证结果。
 
 ## 许可证
 
-MIT License
-
-## 作者
-
-LuckGoose
+本项目基于 MIT License 开源。
