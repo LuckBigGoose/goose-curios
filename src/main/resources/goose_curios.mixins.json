@@ -6,6 +6,9 @@
   "mixins": [
     "BondVanishingVisibilityMixin",
     "BondWillContainerRightClickMixin",
+    "LovinsWrathArmorSlotMixin",
+    "LovinsWrathArmorUseMixin",
+    "LovinsWrathElytraUseMixin",
     "bondwill.BondWillServerLevelEntityTickMixin",
     "SlimeAccessor"
   ],

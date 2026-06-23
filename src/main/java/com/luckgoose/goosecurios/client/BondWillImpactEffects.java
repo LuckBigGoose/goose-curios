@@ -24,8 +24,6 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import org.joml.Matrix4f;
 import com.mojang.math.Axis;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -54,8 +52,6 @@ import java.util.List;
  * @author luckgoose
  */
 public class BondWillImpactEffects {
-    private static final Logger LOGGER = LoggerFactory.getLogger(BondWillImpactEffects.class);
-
     /** 活跃的冲击波实例列表 */
     private static final List<PunchInstance> INSTANCES = new ArrayList<>();
     
@@ -260,10 +256,7 @@ public class BondWillImpactEffects {
                 setUniform(pass, "LockIntensity", 0.0F);
                 setUniform(pass, "Time", (System.currentTimeMillis() % 1000000L) / 1000.0F);
             }
-        } catch (RuntimeException e) {
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("Failed to update shader uniform", e);
-            }
+        } catch (RuntimeException ignored) {
             // 降级：禁用效果但不崩溃
             BondWillPostEffectCoordinator.release(Minecraft.getInstance(), BondWillPostEffectCoordinator.Effect.PUNCH);
         }

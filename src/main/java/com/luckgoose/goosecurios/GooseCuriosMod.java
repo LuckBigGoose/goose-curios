@@ -5,8 +5,10 @@ import com.luckgoose.goosecurios.compat.tacz.CyberPsychosisTaczEvents;
 import com.luckgoose.goosecurios.config.BondWillConfig;
 import com.luckgoose.goosecurios.config.CyberPsychosisConfig;
 import com.luckgoose.goosecurios.config.GooseClientConfig;
+import com.luckgoose.goosecurios.config.LovinsWrathConfig;
 import com.luckgoose.goosecurios.config.NineCalamitiesConfig;
 import com.luckgoose.goosecurios.event.GoetyEventBridge;
+import com.luckgoose.goosecurios.event.LovinsWrathEventHandler;
 import com.luckgoose.goosecurios.event.NineCalamitiesEventHandler;
 import com.luckgoose.goosecurios.init.ModCreativeTabs;
 import com.luckgoose.goosecurios.init.ModEffects;
@@ -30,7 +32,7 @@ import org.slf4j.LoggerFactory;
  * - 赛博精神病（Cyber Psychosis）：TACZ附属，移除原版的爆头，累计叠加触发爆头
  * 
  * @author luckgoose
- * @version 1.0.0
+ * @version 1.0.2
  */
 @Mod(GooseCuriosMod.MOD_ID)
 public class GooseCuriosMod {
@@ -49,7 +51,7 @@ public class GooseCuriosMod {
      * 执行顺序：注册器 → 网络 → 配置 → 事件
      */
     public GooseCuriosMod() {
-        LOGGER.info("Initializing Goose Curios Mod v1.0.0");
+        LOGGER.info("Initializing Goose Curios Mod v1.0.2");
         
         try {
             IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
@@ -57,13 +59,10 @@ public class GooseCuriosMod {
             ModEffects.register(modBus);
             ModSounds.register(modBus);
             ModCreativeTabs.register(modBus);
-            LOGGER.debug("Registered deferred registries");
             
             ModNetwork.register();
-            LOGGER.debug("Registered network channel");
 
             registerConfigs();
-            LOGGER.debug("Registered configuration files");
 
             registerEventHandlers();
             LOGGER.info("Goose Curios Mod initialization completed successfully");
@@ -84,6 +83,7 @@ public class GooseCuriosMod {
                 CyberPsychosisConfig.SPEC, "goose/goose-curios/cyber-psychosis.toml");
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, 
                 BondWillConfig.SPEC, "goose/goose-curios/bond-will.toml");
+        LovinsWrathConfig.load();
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, 
                 GooseClientConfig.SPEC, "goose/goose-curios/client.toml");
     }
@@ -98,7 +98,6 @@ public class GooseCuriosMod {
         
         MinecraftForge.EVENT_BUS.register(new CyberPsychosisTaczEvents());
         MinecraftForge.EVENT_BUS.register(new BondWillTaczEvents());
-        
-        LOGGER.debug("Registered event handlers for all curio items");
+        MinecraftForge.EVENT_BUS.register(new LovinsWrathEventHandler());
     }
 }

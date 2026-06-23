@@ -32,14 +32,14 @@ import java.util.Locale;
  * 1. 潜行隐身：脱战状态下使用枪械瞄准可进入隐身状态（BondVanishing效果）
  * 2. 伤害累积：隐身期间每秒增加伤害加成（默认5%/秒，上限100%）
  * 3. 时停效果：伤害加成达到100%时进入时停状态，周围 timeStopRadius（配置项，默认30格）内的非玩家实体被冻结
- * 4. 冷却惩罚：脱离隐身状态后有冷却期，期间造成的伤害降低90%
+ * 4. 冷却惩罚：造成有效枪械伤害且未完成击杀后进入冷却期，期间造成的伤害降低90%
  * 
  * 【状态流转】
- * 正常 -> 脱战+瞄准 -> 隐身+蓄力 -> 伤害加成100% -> 时停 -> 造成伤害/移动 -> 冷却惩罚 -> 正常
+ * 正常 -> 脱战+瞄准 -> 隐身+蓄力 -> 伤害加成100% -> 时停 -> 造成有效枪械伤害 -> 冷却惩罚 -> 正常
  * 
  * 【与TACZ枪械模组的集成】
  * - 检测玩家的瞄准进度（getSynAimingProgress）
- * - 拦截枪械伤害事件（EntityHurtByGunEvent）并应用加成
+ * - 在最终伤害事件中处理TACZ枪械伤害，只有最终伤害大于0才进入战斗
  * - 在时停状态下允许玩家继续开火
  * 
  * @author luckgoose
@@ -74,7 +74,7 @@ public class BondWillItem extends Item implements ICurioItem {
      * 1. 阴影中的幽灵：瞄准时获得隐匿
      * 2. 耐心者的馈赠：静候时获得增伤
      * 3. 谢幕前的完美：蓄满时获得屏息
-     * 4. 失手后的代价：暴露时获得破绽
+     * 4. 失手后的代价：有效伤害未击杀后获得破绽
      */
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {

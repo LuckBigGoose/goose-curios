@@ -105,9 +105,6 @@ public final class BondWillTimeStopManager {
         UUID playerUUID = player.getUUID();
         INSTANCES.remove(playerUUID);
 
-        LOGGER.debug("Removing time stop for player {}", player.getName().getString());
-        LOGGER.debug("Currently frozen entities: {}", FROZEN.size());
-
         // S1 修复：仅解冻归属该玩家的实体，跳过其他玩家冻结的实体
         Iterator<Map.Entry<UUID, BondWillFrozenEntityState>> iterator = FROZEN.entrySet().iterator();
         int unfrozenCount = 0;

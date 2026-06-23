@@ -3,6 +3,7 @@ package com.luckgoose.goosecurios.init;
 import com.luckgoose.goosecurios.GooseCuriosMod;
 import com.luckgoose.goosecurios.item.BondWillItem;
 import com.luckgoose.goosecurios.item.CyberPsychosisItem;
+import com.luckgoose.goosecurios.item.LovinsWrathItem;
 import com.luckgoose.goosecurios.item.NineDemonsNineCalamitiesRingItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
@@ -33,6 +34,10 @@ public class ModItems {
     /** 邦德的意志戒指 */
     public static final RegistryObject<Item> BOND_WILL = ITEMS.register("bond_will",
             () -> new BondWillItem(new Item.Properties().stacksTo(1)));
+
+    /** lovin的愤怒戒指 */
+    public static final RegistryObject<Item> LOVINS_WRATH = ITEMS.register("lovins_wrath",
+            () -> new LovinsWrathItem(new Item.Properties().stacksTo(1).rarity(Rarity.EPIC)));
 
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);

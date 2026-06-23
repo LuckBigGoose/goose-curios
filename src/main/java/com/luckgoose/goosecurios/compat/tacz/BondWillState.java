@@ -17,10 +17,10 @@ import java.util.concurrent.ConcurrentMap;
  * <ul>
  *   <li>装备状态：记录玩家装备数量</li>
  *   <li>伤害加成：记录当前累积的加成百分比</li>
- *   <li>战斗状态：追踪造成伤害、受到伤害、暴露的时间点</li>
+ *   <li>战斗状态：追踪造成有效枪械伤害的时间点</li>
  * </ul>
  * 
- * <p>脱战判定：当前时间 - max(最后伤害时间, 最后受伤时间, 最后暴露时间) &gt; 脱战阈值
+ * <p>脱战判定：当前时间 - 最后造成有效枪械伤害时间 &gt; 脱战阈值
  * 
  * <p>线程安全：使用ConcurrentHashMap保证多线程环境下的数据安全
  * 
@@ -38,15 +38,9 @@ public class BondWillState {
     /** 加成更新时间：玩家UUID → 游戏刻 */
     private static final ConcurrentMap<UUID, Integer> LAST_BONUS_TICKS = new ConcurrentHashMap<>();
     
-    /** 最后造成伤害时间：玩家UUID → 游戏刻 */
+    /** 最后造成有效枪械伤害时间：玩家UUID → 游戏刻 */
     private static final ConcurrentMap<UUID, Integer> LAST_DAMAGE_DEALT_TICKS = new ConcurrentHashMap<>();
     
-    /** 最后受到伤害时间：玩家UUID → 游戏刻 */
-    private static final ConcurrentMap<UUID, Integer> LAST_DAMAGE_TAKEN_TICKS = new ConcurrentHashMap<>();
-    
-    /** 最后暴露时间：玩家UUID → 游戏刻 */
-    private static final ConcurrentMap<UUID, Integer> LAST_REVEAL_TICKS = new ConcurrentHashMap<>();
-
     /** 加成消耗时间：玩家UUID → 消耗时的游戏刻（用于延迟清空，允许穿甲弹第二段也享受加成） */
     private static final ConcurrentMap<UUID, Integer> BONUS_CONSUMED_TICK = new ConcurrentHashMap<>();
 
@@ -112,7 +106,7 @@ public class BondWillState {
      * 判断玩家是否脱离战斗
      * 
      * 脱战条件：距离最后一次战斗行为的时间超过配置阈值（默认100tick）
-     * 战斗行为包括造成伤害、受到伤害、被暴露（时停结束等）
+     * 战斗行为只包括玩家造成有效TACZ枪械伤害，受到伤害和暴露不会进入战斗。
      * 
      * 使用long类型计算避免tick溢出问题（服务器运行约50天后tick会溢出）
      * 
@@ -149,54 +143,23 @@ public class BondWillState {
     /**
      * 获取最后一次战斗行为的时间
      * 
-     * 取三个时间戳的最大值
+     * 只取最后一次造成有效枪械伤害的时间戳。
      * 
      * @param uuid 玩家UUID
      * @return 最后战斗时间戳
      */
     private static int getLastCombatTick(UUID uuid) {
-        int lastDealt = LAST_DAMAGE_DEALT_TICKS.getOrDefault(uuid, DEFAULT_COMBAT_TICK);
-        int lastTaken = LAST_DAMAGE_TAKEN_TICKS.getOrDefault(uuid, DEFAULT_COMBAT_TICK);
-        int lastReveal = LAST_REVEAL_TICKS.getOrDefault(uuid, DEFAULT_COMBAT_TICK);
-        return Math.max(Math.max(lastDealt, lastTaken), lastReveal);
+        return LAST_DAMAGE_DEALT_TICKS.getOrDefault(uuid, DEFAULT_COMBAT_TICK);
     }
 
     /**
-     * 标记玩家造成伤害
+     * 标记玩家造成有效枪械伤害。
      * 
      * @param uuid 玩家UUID
      * @param currentTick 当前游戏刻
      */
     public static void markDamageDealt(UUID uuid, int currentTick) {
         LAST_DAMAGE_DEALT_TICKS.put(uuid, currentTick);
-    }
-
-    /**
-     * 标记玩家受到伤害
-     * 
-     * @param uuid 玩家UUID
-     * @param currentTick 当前游戏刻
-     */
-    public static void markDamageTaken(UUID uuid, int currentTick) {
-        LAST_DAMAGE_TAKEN_TICKS.put(uuid, currentTick);
-    }
-
-    /**
-     * 标记玩家被"暴露"
-     * 
-     * <p>
-     * "暴露"发生在以下情况：
-     * <ul>
-     *   <li>时停效果结束</li>
-     *   <li>伤害窗口超时</li>
-     * </ul>
-     * </p>
-     * 
-     * @param uuid 玩家UUID
-     * @param currentTick 当前游戏刻
-     */
-    public static void markRevealed(UUID uuid, int currentTick) {
-        LAST_REVEAL_TICKS.put(uuid, currentTick);
     }
 
     /**
@@ -358,8 +321,6 @@ public class BondWillState {
      */
     public static void clearCombatHistory(UUID uuid) {
         LAST_DAMAGE_DEALT_TICKS.remove(uuid);
-        LAST_DAMAGE_TAKEN_TICKS.remove(uuid);
-        LAST_REVEAL_TICKS.remove(uuid);
     }
 
     /**
@@ -440,8 +401,6 @@ public class BondWillState {
         clearActiveState(player);
         EQUIPPED_COUNTS.remove(uuid);
         LAST_DAMAGE_DEALT_TICKS.remove(uuid);
-        LAST_DAMAGE_TAKEN_TICKS.remove(uuid);
-        LAST_REVEAL_TICKS.remove(uuid);
     }
     
     /**
@@ -460,12 +419,6 @@ public class BondWillState {
     public static void cleanupStaleData(int currentTick, int staleThreshold) {
         // 清理过期的战斗时间戳
         LAST_DAMAGE_DEALT_TICKS.entrySet().removeIf(
-            entry -> currentTick - entry.getValue() > staleThreshold
-        );
-        LAST_DAMAGE_TAKEN_TICKS.entrySet().removeIf(
-            entry -> currentTick - entry.getValue() > staleThreshold
-        );
-        LAST_REVEAL_TICKS.entrySet().removeIf(
             entry -> currentTick - entry.getValue() > staleThreshold
         );
         LAST_BONUS_TICKS.entrySet().removeIf(

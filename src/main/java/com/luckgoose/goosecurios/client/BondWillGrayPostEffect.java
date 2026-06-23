@@ -6,8 +6,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.PostChain;
 import net.minecraft.client.renderer.PostPass;
 import net.minecraft.util.Mth;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
@@ -28,8 +26,6 @@ import java.util.List;
  * @author luckgoose
  */
 public final class BondWillGrayPostEffect {
-    private static final Logger LOGGER = LoggerFactory.getLogger(BondWillGrayPostEffect.class);
-    
     /** 特效是否激活 */
     private static boolean active;
     
@@ -89,10 +85,7 @@ public final class BondWillGrayPostEffect {
                 setUniform(pass, "FallOff", fallOff);
                 setUniform(pass, "Saturation", saturation);
             }
-        } catch (RuntimeException e) {
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("Failed to update shader uniform", e);
-            }
+        } catch (RuntimeException ignored) {
             // 降级：禁用效果但不崩溃
             BondWillPostEffectCoordinator.release(minecraft, BondWillPostEffectCoordinator.Effect.TIME_STOP_GRAY);
         }

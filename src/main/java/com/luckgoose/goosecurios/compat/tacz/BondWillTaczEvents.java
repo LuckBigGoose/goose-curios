@@ -9,7 +9,6 @@ import com.luckgoose.goosecurios.network.BondWillSyncPacket;
 import com.luckgoose.goosecurios.network.ModNetwork;
 import com.luckgoose.goosecurios.config.BondWillConfig;
 import com.tacz.guns.api.entity.IGunOperator;
-import com.tacz.guns.api.event.common.EntityHurtByGunEvent;
 import com.tacz.guns.api.item.IGun;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
@@ -18,7 +17,6 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.network.PacketDistributor;
@@ -35,7 +33,7 @@ import java.util.UUID;
  * <p>实现核心游戏机制：
  * <ul>
  *   <li>隐身蓄力系统：脱战状态下累积伤害加成</li>
- *   <li>伤害加成应用：首次伤害触发，立即清空加成值</li>
+ *   <li>伤害加成应用：首次有效枪械伤害触发，立即清空加成值</li>
  *   <li>时停效果触发：满蓄力时可触发范围时停</li>
  * </ul>
  *
@@ -86,10 +84,10 @@ public class BondWillTaczEvents {
         if (consumedTick != null && currentTick - consumedTick >= 2) {
             // 检查是否击杀了目标
             boolean killedTarget = BondWillState.hasKilledRecently(uuid);
-            
+
             // 清空加成
             BondWillState.clearActiveState(player);
-            
+
             // 根据击杀状态决定是否标记战斗
             if (!killedTarget) {
                 // 未击杀：标记战斗，进入冷却期
@@ -98,16 +96,13 @@ public class BondWillTaczEvents {
                 // 击杀：清理所有旧战斗记录，奖励完美刺杀
                 BondWillState.clearCombatHistory(uuid);
             }
-            
+
             // 清理追踪信息
             BondWillState.clearBonusConsumed(uuid);
             BondWillState.clearAttackTracking(uuid);
         }
 
         if (!canStealth(player, uuid, currentTick)) {
-            if (BondWillTimeStopState.isTimeStopActive(uuid)) {
-                BondWillState.markRevealed(uuid, currentTick);
-            }
             cancel(player, false);
             if (currentTick % SYNC_INTERVAL_TICKS == 0) {
                 sync(player, false);
@@ -118,33 +113,10 @@ public class BondWillTaczEvents {
         BondWillState.activateStealth(player);
         BondWillState.tickBonus(uuid, currentTick);
         tickTimeStop(player, uuid);
-        
+
         if (currentTick % SYNC_INTERVAL_TICKS == 0) {
             sync(player, true);
         }
-    }
-
-    /**
-     * 处理枪械伤害事件（Early阶段）
-     * 
-     * <p>仅用于标记造成伤害，不再修改伤害值
-     * <p>伤害修改已移至 {@link #onLivingDamage(LivingDamageEvent)}
-     *
-     * @param event 枪械伤害事件
-     */
-    @SubscribeEvent
-    public void onGunHurt(EntityHurtByGunEvent.Pre event) {
-        if (!(event.getAttacker() instanceof ServerPlayer player)) {
-            return;
-        }
-
-        UUID uuid = player.getUUID();
-        if (!BondWillState.isEquipped(uuid)) {
-            return;
-        }
-
-        int currentTick = player.server.getTickCount();
-        BondWillState.markDamageDealt(uuid, currentTick);
     }
 
     /**
@@ -153,9 +125,10 @@ public class BondWillTaczEvents {
      * 此时伤害已经过护甲、抗性等计算，加成为最终独立乘区
      *
      * 逻辑：
-     * - 有加成：应用加成伤害，标记消耗（延迟2 tick清空，允许穿甲弹第二段也享受）
+     * - 有加成且最终伤害大于0：应用加成伤害，标记消耗（延迟2 tick清空，允许穿甲弹第二段也享受）
      * - 延迟期内：继续应用加成（穿甲弹第二段）
      * - 无加成且战斗中：应用冷却惩罚（-90%伤害）
+     * - 最终伤害为0：不消耗加成，不标记战斗
      *
      * @param event 生物伤害事件
      */
@@ -178,7 +151,7 @@ public class BondWillTaczEvents {
         }
 
         int currentTick = player.server.getTickCount();
-        
+
         // 检查是否在延迟清空期间（穿甲弹第二段）
         Integer consumedTick = BondWillState.getBonusConsumedTick(uuid);
         if (consumedTick != null && currentTick - consumedTick < 2) {
@@ -189,13 +162,17 @@ public class BondWillTaczEvents {
             }
             return; // 不重复处理
         }
-        
+
         double bonus = BondWillState.getBonus(uuid);
         boolean outOfCombat = BondWillState.isOutOfCombat(uuid, currentTick);
 
         if (bonus > 0.0D) {
             // 应用伤害加成
             event.setAmount((float) (event.getAmount() * (1.0D + bonus)));
+            // 0伤害命中不算暴露：不消耗加成、不追踪目标、不进入战斗。
+            if (!hasEffectiveDamage(event)) {
+                return;
+            }
 
             // 只在接近满值时触发冲击波特效（进度 >= 0.95）
             double progress = BondWillState.getProgress(uuid);
@@ -223,6 +200,10 @@ public class BondWillTaczEvents {
             event.setAmount((float) (event.getAmount() * multiplier));
         }
 
+        if (!hasEffectiveDamage(event)) {
+            return;
+        }
+
         // 再次检查是否在延迟窗口内（避免重复标记战斗）
         if (consumedTick != null && currentTick - consumedTick < 2) {
             // 在延迟窗口内，可能是穿甲弹后续伤害或击杀判定窗口
@@ -235,11 +216,15 @@ public class BondWillTaczEvents {
         cancel(player, true);
     }
 
+    private static boolean hasEffectiveDamage(LivingDamageEvent event) {
+        return event.getAmount() > 0.0F;
+    }
+
     /**
      * 判断伤害是否由TACZ枪械造成
-     * 
+     *
      * <p>优化版本：使用 ResourceLocation 比较而非字符串，减少 GC 压力
-     * 
+     *
      * @param event 伤害事件
      * @return 是否为枪械伤害
      */
@@ -247,29 +232,16 @@ public class BondWillTaczEvents {
         // 检查直接伤害实体是否为 TACZ 弹射物
         Entity directEntity = event.getSource().getDirectEntity();
         if (directEntity != null) {
-            net.minecraft.resources.ResourceLocation entityTypeId = 
+            net.minecraft.resources.ResourceLocation entityTypeId =
                 net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(directEntity.getType());
             if (entityTypeId != null && "tacz".equals(entityTypeId.getNamespace())) {
                 return true;
             }
         }
-        
+
         // 检查伤害源类型是否包含枪械相关关键字
         String damageType = event.getSource().getMsgId();
         return damageType != null && (damageType.contains("bullet") || damageType.contains("gun"));
-    }
-
-    /**
-     * 处理生物受伤事件
-     *
-     * 只处理玩家受到伤害的情况，打断隐身状态
-     */
-    @SubscribeEvent
-    public void onLivingHurt(LivingHurtEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) {
-            BondWillState.markDamageTaken(player.getUUID(), player.server.getTickCount());
-            cancel(player, true);
-        }
     }
 
     /**
@@ -406,7 +378,6 @@ public class BondWillTaczEvents {
         }
         BondWillTimeStopManager.addOrUpdateInstance(player);
         if (BondWillTimeStopState.tick(uuid)) {
-            BondWillState.markRevealed(uuid, player.server.getTickCount());
             cancel(player, true);
         }
     }

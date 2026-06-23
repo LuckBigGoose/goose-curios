@@ -10,7 +10,7 @@ import net.minecraft.world.effect.MobEffectCategory;
  * 
  * <p>触发条件：
  * <ul>
- *   <li>脱离战斗（100 tick 未受伤）</li>
+ *   <li>脱离战斗（100 tick 未造成有效枪械伤害）</li>
  *   <li>持枪瞄准（瞄准进度 ≥ 90%）</li>
  *   <li>不移动或缓慢移动</li>
  * </ul>

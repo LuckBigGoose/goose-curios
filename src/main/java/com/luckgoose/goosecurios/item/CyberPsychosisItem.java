@@ -99,14 +99,17 @@ public class CyberPsychosisItem extends Item implements ICurioItem {
      */
     private void addDetailedEffects(List<Component> tooltip) {
         tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.effect.2", 
-                ComponentUtils.percent(CyberPsychosisConfig.INITIAL_CHANCE.get())));
+                percentValue(CyberPsychosisConfig.INITIAL_CHANCE.get())));
         tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.effect.2.detail1", 
-                ComponentUtils.percent(CyberPsychosisConfig.CHANCE_INCREMENT.get()), 
-                ComponentUtils.percent(CyberPsychosisConfig.MAX_CHANCE.get())));
+                percentValue(CyberPsychosisConfig.CHANCE_INCREMENT.get()),
+                percentValue(CyberPsychosisConfig.MAX_CHANCE.get())));
         tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.effect.2.detail2", 
-                ComponentUtils.percent(CyberPsychosisConfig.INITIAL_CHANCE.get())));
+                percentValue(CyberPsychosisConfig.INITIAL_CHANCE.get())));
         tooltip.add(Component.translatable("tooltip.goose_curios.cyber_psychosis.effect.3", 
                 ComponentUtils.seconds(CyberPsychosisConfig.RESET_AFTER_TICKS.get())));
     }
-}
 
+    private static Component percentValue(double value) {
+        return ComponentUtils.gold(String.format(Locale.ROOT, "%.0f", value * 100.0D));
+    }
+}

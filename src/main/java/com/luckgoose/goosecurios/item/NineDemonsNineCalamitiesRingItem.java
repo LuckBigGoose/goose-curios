@@ -110,6 +110,10 @@ public class NineDemonsNineCalamitiesRingItem extends Item implements ICurioItem
         return net.minecraftforge.fml.loading.FMLEnvironment.dist.isClient()
             && ClientUtils.isShiftKeyDown();
     }
+
+    private static Component percentPoint(double value) {
+        return ComponentUtils.gold(String.format(Locale.ROOT, "%.2f", value));
+    }
     
     /**
      * 添加详细效果描述（按住Shift时显示）
@@ -135,9 +139,9 @@ public class NineDemonsNineCalamitiesRingItem extends Item implements ICurioItem
         tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.ability.1.detail1",
                 ComponentUtils.gold(currentWands), ComponentUtils.gold(maxWands), ComponentUtils.gold(String.format(Locale.ROOT, "%.2f", currentBonus))));
         tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.ability.1.detail2",
-                ComponentUtils.percent(NineCalamitiesConfig.FIRST_WAND_BONUS_PERCENT.get()),
-                ComponentUtils.percent(NineCalamitiesConfig.BONUS_DECAY_PER_WAND_PERCENT.get()),
-                ComponentUtils.percent(NineCalamitiesConfig.MIN_WAND_BONUS_PERCENT.get())));
+                percentPoint(NineCalamitiesConfig.FIRST_WAND_BONUS_PERCENT.get()),
+                percentPoint(NineCalamitiesConfig.BONUS_DECAY_PER_WAND_PERCENT.get()),
+                percentPoint(NineCalamitiesConfig.MIN_WAND_BONUS_PERCENT.get())));
         tooltip.add(Component.empty());
         
         // 能力2：施法共振
@@ -146,7 +150,6 @@ public class NineDemonsNineCalamitiesRingItem extends Item implements ICurioItem
                 ComponentUtils.seconds(NineCalamitiesConfig.CAST_BONUS_DURATION_TICKS.get())));
         tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.ability.2.detail2"));
         tooltip.add(Component.translatable("tooltip.goose_curios.nine_calamities.ability.2.detail3",
-                ComponentUtils.percent(NineCalamitiesConfig.CAST_BONUS_PER_WAND_PERCENT.get())));
+                percentPoint(NineCalamitiesConfig.CAST_BONUS_PER_WAND_PERCENT.get())));
     }
 }
-

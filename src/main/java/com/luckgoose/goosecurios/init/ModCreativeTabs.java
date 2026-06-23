@@ -28,6 +28,7 @@ public class ModCreativeTabs {
                 output.accept(ModItems.NINE_DEMONS_NINE_CALAMITIES.get());
                 output.accept(ModItems.CYBER_PSYCHOSIS.get());
                 output.accept(ModItems.BOND_WILL.get());
+                output.accept(ModItems.LOVINS_WRATH.get());
             })
             .build());
 
